@@ -1,0 +1,6 @@
+# ⏳ To Implement Next (Immediate)
+
+1.  **Refine `performAction` State Check:** Remove the temporary bypass allowing default `update`/`delete` actions to ignore the state machine check. Decide on the final logic (e.g., require explicit allowance in state, or allow by default unless explicitly forbidden).
+2.  **Implement Custom Action Logic:** The `default` case in `performAction` currently only handles state transitions. Add capability to execute specific logic for custom actions defined in state machines (this likely requires a way to register action handlers/functions).
+3.  **Configuration/Schema Loading:** Move `StateMachineDefinition`s and potentially relationship rules/presentation hints/prompts out of code into configuration files (e.g., JSON, YAML) loaded at startup.
+4.  **Refine MCP Bridge Error Handling:** Use specific custom error types (e.g., `ResourceNotFoundError`, `ValidationError`, `ActionNotAllowedError`) thrown by the store/state machine and map them more accurately to MCP error responses/HTTP statuses in the bridge. 

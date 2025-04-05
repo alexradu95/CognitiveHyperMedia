@@ -1,0 +1,3824 @@
+# Cognitive Hypermedia: A Framework for LLM-Native Applications
+
+**White Paper - Version 1.0**  
+April 2025
+
+## Executive Summary
+
+Cognitive Hypermedia represents a fundamental reimagining of application architecture for the age of Large Language Models (LLMs). This white paper introduces a novel framework that bridges the gap between traditional hypermedia systems and the unique capabilities of LLMs, enabling truly AI-native applications.
+
+Traditional hypermedia approaches like HATEOAS (Hypermedia as the Engine of Application State) were designed for human consumption via web browsers. While powerful, these approaches don't align with how LLMs process information and interact with systems. Cognitive Hypermedia adapts these principles for LLM-driven interfaces, creating a mental model that feels natural to both AI and humans.
+
+This framework establishes a standardized approach for building applications where LLMs serve as the primary interface between users and systems. By providing rich, context-aware resources with explicit actions, state representations, and conversation guidance, Cognitive Hypermedia enables LLMs to generate more accurate, helpful, and consistent user experiences.
+
+Key innovations include:
+- Concept-oriented navigation instead of URI-based linking
+- Action-centric representation emphasizing capabilities
+- Built-in conversational prompts for natural dialogue flow
+- Explicit state machine representation for predictable transitions
+- Presentation hints that guide but don't constrain UI generation
+- Relationship modeling through concepts rather than hyperlinks
+
+Implementation via the Model Context Protocol (MCP) allows seamless integration with existing LLM ecosystems while providing a structured approach to designing robust, scalable AI applications. This paper provides detailed specifications, implementation patterns, and practical examples to establish Cognitive Hypermedia as a new standard for LLM-driven application development.
+
+## 1. Introduction
+
+### 1.1 The Evolution of Application Interfaces
+
+The history of application interfaces represents a journey of increasing abstraction and natural interaction. Command line interfaces gave way to graphical user interfaces, which in turn evolved into web-based interfaces. Each step removed barriers and made technology more accessible to broader audiences.
+
+We now stand at the precipice of another paradigm shift: conversational interfaces powered by Large Language Models. These models don't merely respond to predefined commands but understand and generate natural language, opening possibilities for more intuitive human-computer interaction. Instead of adapting to the computer's interface paradigms, users can express their intent naturally, with the LLM bridging the gap between human expression and machine execution.
+
+However, for LLMs to effectively serve as this bridge, they need structured access to application state and capabilities. Current approaches often treat LLMs as an afterthought layered onto existing paradigms, rather than designing systems where the LLM is a first-class component of the architecture.
+
+### 1.2 The Problem of LLM-System Integration
+
+Current approaches to connecting LLMs with applications suffer from several limitations:
+
+**1. URI-centric hypermedia**  
+Traditional REST APIs use URIs as the primary mechanism for resource manipulation. While LLMs can be taught to construct and follow URIs, this approach doesn't leverage their understanding of concepts and relationships. It forces LLMs to think in terms of URLs rather than in terms of actions and capabilities.
+
+**2. Rigid API specifications**  
+OpenAPI and similar specifications offer detailed descriptions of endpoints but lack rich state representation and transition guidance. LLMs must infer state from structural patterns rather than having it explicitly modeled.
+
+**3. Context window inefficiency**  
+Many existing approaches waste valuable context window space with verbose, repetitive API descriptions or response structures. Each token used for API verbosity is one less token available for user interaction.
+
+**4. Missing conversation guidance**  
+Traditional APIs provide no support for guiding conversations. LLMs must determine appropriate follow-up questions, suggestions, and explanations without application-specific guidance.
+
+**5. Insufficient presentation guidance**  
+When LLMs generate UI descriptions, they lack standardized guidance on how different resources should be presented, leading to inconsistent visualization and interaction patterns.
+
+### 1.3 The Promise of Hypermedia
+
+Hypermedia principles, particularly HATEOAS, offer valuable insights for solving these problems. The core idea—that clients interact with application state through server-provided hypermedia controls—aligns well with how LLMs can serve as interpreters between users and systems.
+
+Key benefits of hypermedia approaches include:
+
+- **Self-documenting interfaces** - The API describes its own capabilities
+- **Runtime adaptation** - Available actions change based on current state
+- **Loose coupling** - Clients don't need to hardcode state transitions
+- **Progressive enhancement** - New capabilities can be added without breaking clients
+
+Hypermedia also offers a clean separation of concerns: the server defines available actions, and the client (in this case, the LLM) determines which actions to take based on user intent.
+
+### 1.4 The Need for a New Approach
+
+Despite these advantages, traditional hypermedia approaches were designed for web browsers and human developers, not LLMs. We need to reimagine hypermedia principles specifically for the LLM context, creating a system that:
+
+1. Aligns with how LLMs process and represent information
+2. Optimizes context window usage for maximum efficiency
+3. Provides explicit guidance for conversation flow
+4. Includes presentation hints for consistent UI generation
+5. Leverages LLMs' understanding of concepts and relationships
+
+This white paper introduces Cognitive Hypermedia, a new approach designed from the ground up for LLM-mediated applications. It combines the proven benefits of hypermedia with novel patterns specifically designed to leverage LLM capabilities and overcome their limitations.
+
+## 2. Theoretical Foundations
+
+### 2.1 HATEOAS Principles and Their Relevance to LLMs
+
+HATEOAS (Hypermedia as the Engine of Application State) represents a mature approach to building self-describing APIs. The core principle is straightforward: applications expose not just data but also the actions that can be performed on that data. These actions are provided as hypermedia controls—typically links and forms—embedded within resource representations.
+
+In a traditional HATEOAS system:
+
+1. Clients start with a well-known entry point (URI)
+2. Resources include hypermedia controls (links, forms)
+3. Clients follow these controls to navigate the application
+4. Application state transitions occur by following links
+5. Clients need no out-of-band information about URI structure
+
+For example, a task resource in a traditional HATEOAS system might include:
+
+```json
+{
+  "id": "task-123",
+  "title": "Implement hypermedia controls",
+  "status": "pending",
+  "_links": {
+    "self": { "href": "/tasks/123" },
+    "start": { "href": "/tasks/123/start", "method": "POST" },
+    "cancel": { "href": "/tasks/123/cancel", "method": "POST" }
+  }
+}
+```
+
+When adapted for LLM consumption, these principles remain valuable. LLMs can interpret hypermedia controls to understand available actions, much like a browser or human developer would. This removes the need for hardcoded knowledge about API endpoints and state transitions.
+
+However, the URI-centric nature of traditional HATEOAS is suboptimal for LLMs. When an LLM processes information, it thinks in terms of concepts and relationships rather than HTTP verbs and URI patterns. Cognitive Hypermedia adapts HATEOAS principles to align with this mental model, replacing URI-centric controls with concept-oriented actions.
+
+### 2.2 Mental Models and LLM Processing
+
+Understanding how LLMs process and represent information is crucial for designing optimal integration patterns. LLMs like Claude don't simply follow algorithms; they build rich internal representations of concepts, relationships, and capabilities.
+
+Key aspects of LLM mental models include:
+
+**1. Conceptual Thinking**  
+LLMs understand the world in terms of concepts rather than identifiers. They naturally grasp that a "task" has properties like "status" and can undergo transitions like "completion" without requiring explicit URI mappings.
+
+**2. Relationship Mapping**  
+LLMs excel at understanding relationships between entities. They can intuitively grasp that a task belongs to a project or is assigned to a user without needing explicit link structures.
+
+**3. State Awareness**  
+LLMs can maintain awareness of system state and understand constraints on state transitions. They benefit from explicit state representation but can also infer state from context.
+
+**4. Conversational Context**  
+Unlike traditional API clients, LLMs maintain conversational context across interactions, remembering previous exchanges and building cumulative understanding.
+
+**5. Presentation Flexibility**  
+LLMs can generate varied presentations of the same underlying information depending on context, user preferences, and conversation history.
+
+Cognitive Hypermedia aligns with these mental model characteristics, designing resource representations that leverage LLMs' conceptual understanding rather than forcing them into URI-centric patterns.
+
+### 2.3 Information Architecture for AI Systems
+
+Effective information architecture for AI systems differs from traditional approaches. When designing for LLM consumption, several principles emerge:
+
+**1. Progressive Disclosure**  
+Information should be structured in layers, with high-level concepts presented first and details available on demand. This allows LLMs to focus on the most relevant aspects while having access to deeper information when needed.
+
+**2. Explicit State Representation**  
+While humans often infer state from context clues, LLMs benefit from explicit state representation with clear transition paths. This reduces hallucinations and ensures accurate system understanding.
+
+**3. Conversation Guidance**  
+Unlike traditional interfaces where users independently explore options, conversational interfaces benefit from explicit guidance on likely next steps, common questions, and suggested actions.
+
+**4. Relationship Explicitness**  
+Relationships between resources should be explicitly modeled rather than implied through links. This helps LLMs build accurate mental maps of the application domain.
+
+**5. Action Centricity**  
+The focus should be on actions and capabilities rather than data structures and endpoints. This aligns with how users express intent in conversations.
+
+**6. Contextual Efficiency**  
+Information architecture must be designed with the LLM's context window limitations in mind, prioritizing density and relevance over verbosity.
+
+Cognitive Hypermedia incorporates these principles to create an information architecture specifically optimized for LLM-mediated applications.
+
+### 2.4 The Model Context Protocol
+
+The Model Context Protocol (MCP) provides the foundational transport layer for Cognitive Hypermedia. MCP enables bidirectional communication between LLMs and external tools, allowing LLMs to:
+
+1. Discover available capabilities through tool registration
+2. Invoke tools with structured parameters
+3. Receive tool responses in standard formats
+
+MCP offers several advantages as the foundation for Cognitive Hypermedia:
+
+- **Standardized Integration** - Consistent patterns across different LLMs
+- **Structured Communication** - Type-safe parameter passing and response handling
+- **Tool Discovery** - Dynamic registration of available tools
+- **Error Handling** - Consistent error reporting patterns
+
+Cognitive Hypermedia builds on MCP, providing higher-level patterns for resource representation, action definition, and state management. The MCP tool interface serves as the transport mechanism, while Cognitive Hypermedia defines the structure and semantics of the data exchanged through this interface.
+
+## 3. Core Principles of Cognitive Hypermedia
+
+Cognitive Hypermedia is built on six foundational principles that guide its design and implementation. Each principle addresses specific challenges in LLM-system integration and contributes to the overall goal of creating natural, efficient, and powerful AI interfaces.
+
+### 3.1 Conceptual Navigation
+
+**Traditional Approach**: URI-based navigation where clients follow links with specific endpoints and HTTP methods.
+
+**Cognitive Hypermedia Approach**: Concept-based navigation where LLMs explore resources and relationships through semantic identifiers rather than URIs.
+
+In traditional hypermedia, a client might navigate from a user to their tasks by following a link like `/users/123/tasks`. In Cognitive Hypermedia, the LLM simply expresses interest in the "tasks" related to a particular "user" concept. The system handles the underlying data fetching without requiring the LLM to construct or follow specific URIs.
+
+This approach leverages LLMs' natural understanding of conceptual relationships. Rather than teaching LLMs to construct and parse URIs, we allow them to think in terms of the domain concepts they already understand.
+
+**Example:**
+```typescript
+// Traditional HATEOAS navigation
+const userTasksLink = user._links.tasks.href;
+const tasksResponse = await fetch(userTasksLink);
+
+// Cognitive Hypermedia navigation
+const userTasks = await explore({
+  concept: "task",
+  filter: { assignee: user._id }
+});
+```
+
+### 3.2 Action Orientation
+
+**Traditional Approach**: Resources expose links and forms that map to HTTP operations on specific endpoints.
+
+**Cognitive Hypermedia Approach**: Resources expose semantic actions that represent capabilities independent of their implementation details.
+
+Traditional hypermedia focuses on operations that map closely to HTTP verbs: GET, POST, PUT, DELETE. Cognitive Hypermedia abstracts away these implementation details, focusing instead on domain-specific actions like "complete", "assign", or "approve".
+
+This approach aligns with how users express intent in natural language. Users don't think in terms of HTTP verbs; they think in terms of actions they want to perform. By modeling these actions explicitly, we create a more natural mapping between user intent and system capabilities.
+
+**Example:**
+```json
+// Traditional HATEOAS actions
+"_links": {
+  "start": { "href": "/tasks/123/start", "method": "POST" }
+}
+
+// Cognitive Hypermedia actions
+"_actions": {
+  "start": {
+    "description": "Begin working on this task",
+    "effect": "Changes status to in-progress"
+  }
+}
+```
+
+### 3.3 Context Optimization
+
+**Traditional Approach**: Verbose resource representations with standardized but often redundant structure.
+
+**Cognitive Hypermedia Approach**: Contextually efficient representations that prioritize information density and relevance.
+
+LLMs operate with limited context windows, making efficient use of this space critical. Cognitive Hypermedia optimizes resource representations to provide maximum information in minimal space, reducing redundancy and prioritizing the most relevant aspects of each resource.
+
+This optimization includes techniques like:
+- Selective property inclusion based on context
+- Abbreviated representations for embedded resources
+- Progressive detail levels for relationships
+- Context-aware expansion of relevant properties
+
+**Example:**
+```json
+// Traditional verbose representation
+{
+  "id": "task-123",
+  "type": "task",
+  "attributes": {
+    "title": "Implement hypermedia controls",
+    "description": "Add HATEOAS-compliant controls to API responses",
+    "status": "pending",
+    "created_at": "2025-04-01T12:00:00Z",
+    "updated_at": "2025-04-01T12:00:00Z"
+  },
+  "relationships": {
+    "assignee": {
+      "data": { "type": "user", "id": "user-456" },
+      "links": { "related": "/users/456" }
+    }
+  }
+}
+
+// Cognitive Hypermedia context-optimized representation
+{
+  "_id": "task-123",
+  "_type": "task",
+  "title": "Implement hypermedia controls",
+  "status": "pending",
+  "_relationships": {
+    "assignee": { "type": "user", "id": "user-456", "preview": "Jane Smith" }
+  }
+}
+```
+
+### 3.4 Conversational Guidance
+
+**Traditional Approach**: No explicit support for guiding conversation flow; clients must determine appropriate follow-up actions independently.
+
+**Cognitive Hypermedia Approach**: Explicit conversation prompts that suggest natural follow-up questions, confirmations, and explanations.
+
+Traditional hypermedia focuses solely on system state and capabilities, providing no guidance on how to communicate these to users. Cognitive Hypermedia adds explicit conversation prompts that help LLMs generate more natural, helpful, and contextually appropriate responses.
+
+These prompts can include:
+- Suggested follow-up questions
+- Confirmation patterns for important actions
+- Explanatory prompts for complex concepts
+- Educational prompts for new users
+
+**Example:**
+```json
+"_prompts": [
+  "Would you like to start working on this task now?",
+  "Should I show you other tasks in this project?",
+  "Do you want to see who this task is assigned to?"
+]
+```
+
+### 3.5 Presentation Awareness
+
+**Traditional Approach**: No guidance on how resources should be presented; clients determine presentation independently.
+
+**Cognitive Hypermedia Approach**: Explicit presentation hints that guide but don't dictate how resources should be visualized and interacted with.
+
+When LLMs generate interfaces, they benefit from guidance on how different resources should be presented. Cognitive Hypermedia includes presentation hints that help LLMs create consistent, appropriate visualizations without restricting their ability to adapt to context.
+
+These hints can include:
+- Priority level for resource presentation
+- Suggested visualization type (card, list item, detail view)
+- Color and icon recommendations
+- Grouping suggestions
+- Emphasis indicators for important properties
+
+**Example:**
+```json
+"_presentation": {
+  "priority": "high",
+  "visualization": "card",
+  "icon": "task",
+  "color": "blue",
+  "grouping": "pending-tasks",
+  "emphasisProperty": "dueDate"
+}
+```
+
+### 3.6 State Transparency
+
+**Traditional Approach**: State is often implicit, inferred from resource properties with no explicit representation of the state machine.
+
+**Cognitive Hypermedia Approach**: Explicit state representation with clear indication of current state, available transitions, and transition effects.
+
+Understanding the current state of a resource and the possible state transitions is critical for LLMs to provide accurate guidance. Cognitive Hypermedia makes state explicit, representing both the current state and the available transitions in a clear, structured format.
+
+This explicit state representation helps LLMs:
+- Accurately describe the current system state
+- Explain available actions and their effects
+- Prevent invalid state transitions
+- Guide users through complex workflows
+
+**Example:**
+```json
+"_state": {
+  "current": "pending",
+  "description": "This task hasn't been started yet",
+  "allowedTransitions": ["start", "cancel"]
+}
+```
+
+## 4. The Cognitive Hypermedia Format
+
+This section provides a detailed specification of the Cognitive Hypermedia format, establishing a standard representation for resources that aligns with the principles outlined above.
+
+### 4.1 Resource Structure
+
+A Cognitive Hypermedia resource is represented as a JSON object with the following components:
+
+```json
+{
+  "_id": "string",             // Unique identifier for the resource
+  "_type": "string",           // Resource type
+  
+  // Standard properties (domain-specific)
+  "property1": "value1",
+  "property2": "value2",
+  
+  // Cognitive Hypermedia extensions
+  "_actions": {},              // Available actions (see 4.2)
+  "_state": {},                // State representation (see 4.3)
+  "_relationships": {},        // Related resources (see 4.4)
+  "_presentation": {},         // Presentation hints (see 4.5)
+  "_prompts": []               // Conversation prompts (see 4.6)
+}
+```
+
+Core principles of the resource structure:
+
+1. **Minimal Prefixing**: Only system properties use the underscore prefix, keeping resource properties clean.
+2. **Flat Structure**: Primary properties are at the top level rather than nested for context efficiency.
+3. **Extensions**: All Cognitive Hypermedia extensions use dedicated sections with consistent structure.
+4. **Optional Components**: All extension sections are optional, allowing resources to include only what's relevant.
+
+### 4.2 Action Definitions
+
+The `_actions` object defines operations that can be performed on the resource. Each action is represented as a key-value pair where the key is the action identifier and the value is an action definition object:
+
+```json
+"_actions": {
+  "actionId": {
+    "description": "Human-readable description of the action",
+    "effect": "Description of the action's effect on resource state",
+    "confirmation": "Suggested confirmation message before execution",
+    "parameters": {
+      "paramName": {
+        "type": "string|number|boolean|object|array",
+        "description": "Description of the parameter",
+        "required": true|false,
+        "default": "Default value",
+        "options": ["option1", "option2"]  // For enumerated values
+      }
+    }
+  }
+}
+```
+
+Example action definition for a task resource:
+
+```json
+"_actions": {
+  "start": {
+    "description": "Begin working on this task",
+    "effect": "Changes status to in-progress",
+    "confirmation": "Start working on this task now?"
+  },
+  "assign": {
+    "description": "Assign this task to a user",
+    "effect": "Updates the assignee of this task",
+    "parameters": {
+      "userId": {
+        "type": "string",
+        "description": "ID of the user to assign",
+        "required": true
+      },
+      "notifyUser": {
+        "type": "boolean",
+        "description": "Send notification to the user",
+        "required": false,
+        "default": true
+      }
+    }
+  }
+}
+```
+
+Actions are invoked using the standard `act` tool provided by the Cognitive Hypermedia MCP implementation:
+
+```typescript
+act({
+  concept: "task",
+  id: "task-123",
+  action: "assign",
+  parameters: {
+    userId: "user-456",
+    notifyUser: true
+  }
+});
+```
+
+### 4.3 State Representation
+
+The `_state` object provides explicit representation of the resource's current state and available transitions:
+
+```json
+"_state": {
+  "current": "string",            // Current state identifier
+  "description": "string",        // Human-readable description of current state
+  "allowedTransitions": [],       // Array of allowed action identifiers
+  "disallowedTransitions": [],    // Array of disallowed action identifiers with reasons
+  "history": []                   // Optional array of previous states
+}
+```
+
+Example state representation for a task:
+
+```json
+"_state": {
+  "current": "in-progress",
+  "description": "This task is currently being worked on",
+  "allowedTransitions": ["complete", "pause", "cancel"],
+  "disallowedTransitions": [
+    {
+      "action": "start",
+      "reason": "Task is already in progress"
+    }
+  ],
+  "history": [
+    {
+      "state": "pending",
+      "enteredAt": "2025-04-01T12:00:00Z",
+      "exitedAt": "2025-04-01T14:30:00Z",
+      "actor": "user-456"
+    }
+  ]
+}
+```
+
+The explicit state representation helps LLMs understand:
+- The current state of the resource
+- Which actions can be performed in this state
+- Why certain actions cannot be performed
+- The history of state transitions (when relevant)
+
+This information allows LLMs to provide accurate guidance to users and prevent invalid state transitions.
+
+### 4.4 Relationship Modeling
+
+The `_relationships` object defines connections between resources using a concept-oriented approach:
+
+```json
+"_relationships": {
+  "relationshipName": {
+    "type": "string",          // Related resource type
+    "id": "string",            // Related resource ID
+    "preview": {},             // Preview of the related resource
+    "cardinality": "one|many", // Relationship cardinality
+    "role": "string"           // Relationship role
+  }
+}
+```
+
+Example relationships for a task:
+
+```json
+"_relationships": {
+  "assignee": {
+    "type": "user",
+    "id": "user-456",
+    "preview": {
+      "name": "Jane Smith",
+      "email": "jane@example.com"
+    }
+  },
+  "project": {
+    "type": "project",
+    "id": "project-789",
+    "preview": {
+      "name": "BALAUR Framework",
+      "status": "active"
+    }
+  },
+  "subtasks": {
+    "type": "task",
+    "cardinality": "many",
+    "preview": {
+      "count": 3,
+      "incomplete": 2
+    }
+  }
+}
+```
+
+Key aspects of relationship modeling:
+
+1. **Preview Data**: Provides just enough information about related resources to mention them in conversation without requiring separate fetches.
+2. **Concept Orientation**: Relationships are defined by type and ID rather than URI.
+3. **Cardinality Awareness**: Explicit indication of one-to-one vs. one-to-many relationships.
+
+To explore relationships, the LLM uses the standard `explore` tool:
+
+```typescript
+// Explore the assignee relationship
+explore({
+  concept: "user",
+  id: "user-456"
+});
+
+// Explore the subtasks relationship
+explore({
+  concept: "task",
+  filter: { parentTask: "task-123" }
+});
+```
+
+### 4.5 Presentation Hints
+
+The `_presentation` object provides guidance on how the resource should be visualized and interacted with:
+
+```json
+"_presentation": {
+  "priority": "high|medium|low",        // Importance for UI rendering
+  "visualization": "string",            // Suggested visualization type
+  "icon": "string",                     // Suggested icon
+  "color": "string",                    // Suggested color
+  "grouping": "string",                 // Suggested grouping category
+  "emphasisProperties": [],             // Properties to emphasize
+  "progressIndicator": {},              // Progress visualization guidance
+  "actionPriorities": {}                // Which actions to emphasize
+}
+```
+
+Example presentation hints for a task:
+
+```json
+"_presentation": {
+  "priority": "high",
+  "visualization": "card",
+  "icon": "task",
+  "color": "red",
+  "grouping": "urgent-tasks",
+  "emphasisProperties": ["dueDate", "assignee"],
+  "progressIndicator": {
+    "type": "percentage",
+    "value": 75,
+    "label": "75% complete"
+  },
+  "actionPriorities": {
+    "primary": "complete",
+    "secondary": ["pause", "assign"]
+  }
+}
+```
+
+Presentation hints are suggestive rather than prescriptive. The LLM maintains flexibility to adapt presentation based on:
+- Conversation context
+- User preferences
+- Device capabilities
+- Accessibility requirements
+
+### 4.6 Conversation Prompts
+
+The `_prompts` array provides suggested conversation flows that help the LLM guide the interaction:
+
+```json
+"_prompts": [
+  {
+    "type": "follow-up|confirmation|explanation|suggestion",
+    "text": "Human-readable prompt text",
+    "condition": "when|if expression",  // Optional condition
+    "priority": "high|medium|low"      // Optional priority
+  }
+]
+```
+
+Example conversation prompts for a task:
+
+```json
+"_prompts": [
+  {
+    "type": "follow-up",
+    "text": "Would you like to start working on this task now?",
+    "condition": "when state.current == 'pending'",
+    "priority": "high"
+  },
+  {
+    "type": "suggestion",
+    "text": "I can show you other tasks in this project if you'd like.",
+    "priority": "medium"
+  },
+  {
+    "type": "explanation",
+    "text": "This task is blocked by another task that isn't complete yet.",
+    "condition": "when blocked == true"
+  }
+]
+```
+
+Conversation prompts help the LLM:
+- Suggest natural next steps in the conversation
+- Provide consistent explanations for complex concepts
+- Offer helpful suggestions based on the current context
+- Maintain conversational flow across resource transitions
+
+### 4.7 Collections
+
+Collections in Cognitive Hypermedia represent groups of related resources. They follow the same basic structure as individual resources but with specific conventions for representing multiple items:
+
+```json
+{
+  "_id": "collection-id",
+  "_type": "collection",
+  "itemType": "string",          // Type of items in the collection
+  "items": [],                   // Array of resources
+  "pagination": {},              // Pagination information
+  "filters": {},                 // Applied filters
+  "aggregates": {},              // Collection-level aggregates
+  
+  // Standard Cognitive Hypermedia extensions
+  "_actions": {},
+  "_presentation": {},
+  "_prompts": []
+}
+```
+
+Example task collection:
+
+```json
+{
+  "_id": "tasks-collection",
+  "_type": "collection",
+  "itemType": "task",
+  "items": [
+    {
+      "_id": "task-123",
+      "_type": "task",
+      "title": "Implement Cognitive Hypermedia",
+      "status": "in-progress",
+      "_actions": { /* ... */ },
+      "_state": { /* ... */ }
+    },
+    {
+      "_id": "task-124",
+      "_type": "task",
+      "title": "Write documentation",
+      "status": "pending",
+      "_actions": { /* ... */ },
+      "_state": { /* ... */ }
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 10,
+    "totalItems": 24,
+    "totalPages": 3
+  },
+  "filters": {
+    "status": "active",
+    "assignee": "user-456"
+  },
+  "aggregates": {
+    "completionPercentage": 42,
+    "statusDistribution": {
+      "pending": 8,
+      "in-progress": 6,
+      "completed": 10
+    }
+  },
+  "_actions": {
+    "create": {
+      "description": "Create a new task",
+      "parameters": {
+        "title": { "type": "string", "required": true },
+        "description": { "type": "string" }
+      }
+    },
+    "filter": {
+      "description": "Filter tasks",
+      "parameters": {
+        "status": { 
+          "type": "string", 
+          "options": ["pending", "in-progress", "completed"]
+        },
+        "assignee": { "type": "string" }
+      }
+    }
+  },
+  "_presentation": {
+    "visualization": "list",
+    "grouping": "byStatus"
+  },
+  "_prompts": [
+    {
+      "type": "suggestion",
+      "text": "You can filter these tasks by status or assignee."
+    },
+    {
+      "type": "follow-up",
+      "text": "Would you like to create a new task?"
+    }
+  ]
+}
+```
+
+Key aspects of collections:
+
+1. **Collection-Level Actions**: Actions that apply to the collection as a whole (create, filter, sort).
+2. **Pagination Support**: Clear pagination information to support navigation through large collections.
+3. **Filtering Context**: Explicit representation of currently applied filters.
+4. **Aggregates**: Collection-level statistics and summaries.
+
+To navigate collections, the LLM uses variations of the standard `explore` tool:
+
+```typescript
+// Navigate to the next page
+explore({
+  concept: "task",
+  filter: { status: "active", assignee: "user-456" },
+  pagination: { page: 2, pageSize: 10 }
+});
+
+// Apply different filters
+explore({
+  concept: "task",
+  filter: { status: "completed" }
+});
+```
+
+### 4.8 Error Representation
+
+Cognitive Hypermedia defines a standard error format that provides consistent, actionable error information:
+
+```json
+{
+  "_type": "error",
+  "code": "string",               // Error code
+  "message": "string",            // Human-readable error message
+  "details": {},                  // Additional error details
+  "recoveryActions": [],          // Suggested recovery actions
+  "_prompts": []                  // Conversation prompts for error handling
+}
+```
+
+Example error representation:
+
+```json
+{
+  "_type": "error",
+  "code": "invalid_state_transition",
+  "message": "Cannot complete a task that is not in progress",
+  "details": {
+    "currentState": "pending",
+    "attemptedAction": "complete",
+    "allowedActions": ["start", "cancel"]
+  },
+  "recoveryActions": [
+    {
+      "description": "Start the task first",
+      "action": "start",
+      "parameters": {}
+    }
+  ],
+  "_prompts": [
+    {
+      "type": "explanation",
+      "text": "This task needs to be started before it can be completed. Would you like to start it now?"
+    }
+  ]
+}
+```
+
+Key aspects of error representation:
+
+1. **Actionable Information**: Errors include specific details about what went wrong.
+2. **Recovery Guidance**: Suggested actions to recover from the error.
+3. **Conversation Support**: Prompts to help the LLM explain the error and guide recovery.
+
+## 5. MCP Integration
+
+Cognitive Hypermedia is designed to work seamlessly with the Model Context Protocol (MCP). This section details the standard MCP tools that implement the Cognitive Hypermedia pattern and how they should be used.
+
+### 5.1 Core MCP Tools
+
+Cognitive Hypermedia defines three core MCP tools:
+
+1. **explore**: Navigate and explore resources and collections
+2. **act**: Perform actions on resources
+3. **create**: Create new resources
+
+#### 5.1.1 The `explore` Tool
+
+The `explore` tool allows LLMs to navigate and explore resources and collections:
+
+```typescript
+// Tool definition
+mcp.tool("explore", {
+  concept: z.string().describe("Resource type to explore"),
+  id: z.string().optional().describe("Specific resource ID"),
+  filter: z.record(z.any()).optional().describe("Filter criteria"),
+  pagination: z.object({
+    page: z.number().optional(),
+    pageSize: z.number().optional()
+  }).optional().describe("Pagination options"),
+  include: z.array(z.string()).optional().describe("Relationships to include"),
+  view: z.string().optional().describe("Specific view of the resource")
+}, async (params) => {
+  // Implementation details
+});
+```
+
+**Usage Examples:**
+
+```typescript
+// Explore a specific resource
+explore({
+  concept: "task",
+  id: "task-123"
+});
+
+// Explore a collection with filters
+explore({
+  concept: "task",
+  filter: {
+    status: "pending",
+    assignee: "user-456"
+  }
+});
+
+// Paginate through a collection
+explore({
+  concept: "task",
+  filter: { status: "completed" },
+  pagination: { page: 2, pageSize: 10 }
+});
+
+// Include related resources
+explore({
+  concept: "task",
+  id: "task-123",
+  include: ["subtasks", "comments"]
+});
+
+// Use a specific view
+explore({
+  concept: "project",
+  id: "project-789",
+  view: "taskSummary"
+});
+```
+
+#### 5.1.2 The `act` Tool
+
+The `act` tool allows LLMs to perform actions on resources:
+
+```typescript
+// Tool definition
+mcp.tool("act", {
+  concept: z.string().describe("Resource type"),
+  id: z.string().describe("Resource ID"),
+  action: z.string().describe("Action to perform"),
+  parameters: z.record(z.any()).optional().describe("Action parameters")
+}, async (params) => {
+  // Implementation details
+});
+```
+
+**Usage Examples:**
+
+```typescript
+// Perform an action with no parameters
+act({
+  concept: "task",
+  id: "task-123",
+  action: "start"
+});
+
+// Perform an action with parameters
+act({
+  concept: "task",
+  id: "task-123",
+  action: "assign",
+  parameters: {
+    userId: "user-456",
+    notifyUser: true
+  }
+});
+
+// Perform a collection-level action
+act({
+  concept: "taskCollection",
+  id: "main",
+  action: "batchUpdate",
+  parameters: {
+    filter: { project: "project-789" },
+    update: { priority: "high" }
+  }
+});
+```
+
+#### 5.1.3 The `create` Tool
+
+The `create` tool allows LLMs to create new resources:
+
+```typescript
+// Tool definition
+mcp.tool("create", {
+  concept: z.string().describe("Resource type to create"),
+  data: z.record(z.any()).describe("Resource data")
+}, async (params) => {
+  // Implementation details
+});
+```
+
+**Usage Examples:**
+
+```typescript
+// Create a simple resource
+create({
+  concept: "task",
+  data: {
+    title: "Implement Cognitive Hypermedia",
+    description: "Create a working implementation of the specification",
+    status: "pending"
+  }
+});
+
+// Create a resource with relationships
+create({
+  concept: "task",
+  data: {
+    title: "Write documentation",
+    project: "project-789",
+    assignee: "user-456"
+  }
+});
+```
+
+### 5.2 Response Format
+
+All Cognitive Hypermedia MCP tools return responses in a standard format:
+
+```typescript
+{
+  content: [
+    {
+      type: "text",
+      text: JSON.stringify(resource)
+    }
+  ]
+}
+```
+
+The JSON string in the `text` field contains the Cognitive Hypermedia resource representation as specified in Section 4.
+
+For error cases, the response includes an `isError` flag:
+
+```typescript
+{
+  content: [
+    {
+      type: "text",
+      text: JSON.stringify(error)
+    }
+  ],
+  isError: true
+}
+```
+
+### 5.3 Extended Tools
+
+In addition to the core tools, Cognitive Hypermedia supports extended tools for specific use cases:
+
+#### 5.3.1 The `search` Tool
+
+The `search` tool provides full-text search capabilities:
+
+```typescript
+// Tool definition
+mcp.tool("search", {
+  query: z.string().describe("Search query"),
+  concepts: z.array(z.string()).optional().describe("Resource types to search"),
+  limit: z.number().optional().describe("Maximum results to return")
+}, async (params) => {
+  // Implementation details
+});
+```
+
+**Usage Example:**
+
+```typescript
+// Search for tasks related to documentation
+search({
+  query: "documentation",
+  concepts: ["task", "document"],
+  limit: 10
+});
+```
+
+#### 5.3.2 The `aggregate` Tool
+
+The `aggregate` tool provides aggregated views of resources:
+
+```typescript
+// Tool definition
+mcp.tool("aggregate", {
+  concept: z.string().describe("Resource type"),
+  groupBy: z.string().describe("Field to group by"),
+  metrics: z.array(z.object({
+    field: z.string(),
+    operation: z.enum(["count", "sum", "avg", "min", "max"])
+  })).describe("Metrics to calculate")
+}, async (params) => {
+  // Implementation details
+});
+```
+
+**Usage Example:**
+
+```typescript
+// Get task statistics by status
+aggregate({
+  concept: "task",
+  groupBy: "status",
+  metrics: [
+    { field: "id", operation: "count" },
+    { field: "estimatedHours", operation: "sum" }
+  ]
+});
+```
+
+## 6. Reference Implementation Architecture
+
+This section provides a reference architecture for implementing Cognitive Hypermedia using Deno 2 and MCP. This architecture serves as a blueprint for creating systems that support the Cognitive Hypermedia format and interaction patterns.
+
+### 6.1 System Overview
+
+The reference implementation consists of the following components:
+
+1. **Resource System**: Core classes for representing and manipulating resources
+2. **Store System**: Deno KV-based persistence layer
+3. **MCP Bridge**: Integration with the Model Context Protocol
+4. **State Machine**: Implementation of resource state transitions
+5. **Presentation System**: Generation of presentation hints
+6. **Conversation System**: Management of conversation prompts
+
+The overall architecture follows this pattern:
+
+```
+┌───────────────────────────────────────┐
+│          Cognitive Hypermedia         │
+└───────────────────────────────────────┘
+               │
+    ┌──────────┼──────────┐
+    │          │          │
+┌───▼───┐  ┌───▼───┐  ┌───▼───┐
+│Resource│  │Store  │  │ MCP   │
+│System  │  │System │  │Bridge │
+└───┬───┘  └───┬───┘  └───┬───┘
+    │          │          │
+    └──────────▼──────────┘
+               │
+         ┌─────▼─────┐
+         │  Deno KV  │
+         │  Storage  │
+         └───────────┘
+```
+
+### 6.2 Resource System
+
+The resource system provides the core classes for representing and manipulating Cognitive Hypermedia resources:
+
+```typescript
+class CognitiveResource {
+  private _id: string;
+  private _type: string;
+  private _properties: Record<string, unknown>;
+  private _actions: Record<string, Action>;
+  private _state: ResourceState;
+  private _relationships: Record<string, Relationship>;
+  private _presentation: PresentationHints;
+  private _prompts: ConversationPrompt[];
+
+  constructor(config: {
+    id: string;
+    type: string;
+    properties?: Record<string, unknown>;
+  }) {
+    this._id = config.id;
+    this._type = config.type;
+    this._properties = config.properties || {};
+    this._actions = {};
+    this._state = { current: "default" };
+    this._relationships = {};
+    this._presentation = {};
+    this._prompts = [];
+  }
+
+  // Property accessors
+  getId(): string {
+    return this._id;
+  }
+
+  getType(): string {
+    return this._type;
+  }
+
+  getProperty(name: string): unknown {
+    return this._properties[name];
+  }
+
+  setProperty(name: string, value: unknown): CognitiveResource {
+    this._properties[name] = value;
+    return this;
+  }
+
+  // Action management
+  addAction(id: string, action: Action): CognitiveResource {
+    this._actions[id] = action;
+    return this;
+  }
+
+  getAction(id: string): Action | undefined {
+    return this._actions[id];
+  }
+
+  // State management
+  setState(state: ResourceState): CognitiveResource {
+    this._state = state;
+    return this;
+  }
+
+  getCurrentState(): string {
+    return this._state.current;
+  }
+
+  // Relationship management
+  addRelationship(
+    name: string, 
+    relationship: Relationship
+  ): CognitiveResource {
+    this._relationships[name] = relationship;
+    return this;
+  }
+
+  getRelationship(name: string): Relationship | undefined {
+    return this._relationships[name];
+  }
+
+  // Presentation management
+  setPresentation(hints: PresentationHints): CognitiveResource {
+    this._presentation = { ...this._presentation, ...hints };
+    return this;
+  }
+
+  // Prompt management
+  addPrompt(prompt: ConversationPrompt): CognitiveResource {
+    this._prompts.push(prompt);
+    return this;
+  }
+
+  // Serialization
+  toJSON(): Record<string, unknown> {
+    const result: Record<string, unknown> = {
+      _id: this._id,
+      _type: this._type,
+      ...this._properties
+    };
+
+    // Add extensions if they have content
+    if (Object.keys(this._actions).length > 0) {
+      result._actions = this._actions;
+    }
+
+    if (this._state.current) {
+      result._state = this._state;
+    }
+
+    if (Object.keys(this._relationships).length > 0) {
+      result._relationships = this._relationships;
+    }
+
+    if (Object.keys(this._presentation).length > 0) {
+      result._presentation = this._presentation;
+    }
+
+    if (this._prompts.length > 0) {
+      result._prompts = this._prompts;
+    }
+
+    return result;
+  }
+}
+```
+
+For collections, we extend the base resource class:
+
+```typescript
+class CognitiveCollection extends CognitiveResource {
+  private _itemType: string;
+  private _items: CognitiveResource[];
+  private _pagination?: PaginationInfo;
+  private _filters?: Record<string, unknown>;
+  private _aggregates?: Record<string, unknown>;
+
+  constructor(config: {
+    id: string;
+    itemType: string;
+    items?: CognitiveResource[];
+  }) {
+    super({
+      id: config.id || `${config.itemType}-collection`,
+      type: "collection",
+      properties: { itemType: config.itemType }
+    });
+
+    this._itemType = config.itemType;
+    this._items = config.items || [];
+  }
+
+  // Item management
+  addItem(item: CognitiveResource): CognitiveCollection {
+    this._items.push(item);
+    return this;
+  }
+
+  getItems(): CognitiveResource[] {
+    return [...this._items];
+  }
+
+  // Pagination
+  setPagination(info: PaginationInfo): CognitiveCollection {
+    this._pagination = info;
+    return this;
+  }
+
+  // Filters
+  setFilters(filters: Record<string, unknown>): CognitiveCollection {
+    this._filters = filters;
+    return this;
+  }
+
+  // Aggregates
+  setAggregates(aggregates: Record<string, unknown>): CognitiveCollection {
+    this._aggregates = aggregates;
+    return this;
+  }
+
+  // Override toJSON to include collection-specific properties
+  toJSON(): Record<string, unknown> {
+    const result = super.toJSON();
+    
+    result.items = this._items.map(item => item.toJSON());
+    
+    if (this._pagination) {
+      result.pagination = this._pagination;
+    }
+    
+    if (this._filters) {
+      result.filters = this._filters;
+    }
+    
+    if (this._aggregates) {
+      result.aggregates = this._aggregates;
+    }
+    
+    return result;
+  }
+}
+```
+
+### 6.3 Store System
+
+The store system provides a Deno KV-based persistence layer for Cognitive Hypermedia resources:
+
+```typescript
+class CognitiveStore {
+  private kv: Deno.Kv;
+  private stateMachines: Map<string, StateMachine<string, string>>;
+
+  constructor(kv: Deno.Kv) {
+    this.kv = kv;
+    this.stateMachines = new Map();
+  }
+
+  // Register a state machine for a resource type
+  registerStateMachine(
+    type: string, 
+    stateMachine: StateMachine<string, string>
+  ): void {
+    this.stateMachines.set(type, stateMachine);
+  }
+
+  // Create a new resource
+  async create(
+    type: string,
+    data: Record<string, unknown>
+  ): Promise<CognitiveResource> {
+    const id = data.id as string || crypto.randomUUID();
+    const key = [type, id];
+
+    // Create basic resource properties
+    const resourceData = {
+      ...data,
+      id,
+      createdAt: new Date().toISOString()
+    };
+
+    // Store in KV
+    await this.kv.set(key, resourceData);
+
+    // Create and enhance resource
+    const resource = new CognitiveResource({
+      id: id as string,
+      type,
+      properties: resourceData
+    });
+
+    // Initialize state if a state machine exists
+    if (this.stateMachines.has(type)) {
+      const initialState = this.stateMachines.get(type)!.getInitialState();
+      resource.setState({
+        current: initialState,
+        allowedTransitions: this.stateMachines.get(type)!.getTransitionsFrom(initialState)
+      });
+    }
+
+    // Enhance with standard actions, relationships, etc.
+    this.enhanceResource(resource);
+
+    return resource;
+  }
+
+  // Get a resource by ID
+  async get(
+    type: string,
+    id: string
+  ): Promise<CognitiveResource | null> {
+    const key = [type, id];
+    const result = await this.kv.get<Record<string, unknown>>(key);
+
+    if (!result.value) {
+      return null;
+    }
+
+    // Create basic resource
+    const resource = new CognitiveResource({
+      id,
+      type,
+      properties: result.value
+    });
+
+    // Enhance with actions, state info, relationships, etc.
+    this.enhanceResource(resource);
+
+    return resource;
+  }
+
+  // Get a collection of resources
+  async getCollection(
+    type: string,
+    options: CollectionOptions = {}
+  ): Promise<CognitiveCollection> {
+    const { filter = {}, page = 1, pageSize = 10 } = options;
+
+    // Build prefix for listing
+    const prefix = [type];
+
+    // List matching resources
+    const entries = this.kv.list<Record<string, unknown>>({ prefix });
+    
+    // Apply filters and pagination
+    const filteredItems: Array<[string, Record<string, unknown>]> = [];
+    
+    for await (const entry of entries) {
+      const id = entry.key[entry.key.length - 1] as string;
+      const data = entry.value;
+      
+      // Apply filters
+      if (this.matchesFilter(data, filter)) {
+        filteredItems.push([id, data]);
+      }
+    }
+    
+    // Count total before pagination
+    const total = filteredItems.length;
+    
+    // Apply pagination
+    const startIndex = (page - 1) * pageSize;
+    const paginatedItems = filteredItems.slice(startIndex, startIndex + pageSize);
+    
+    // Create collection
+    const collection = new CognitiveCollection({
+      id: `${type}-collection`,
+      itemType: type
+    });
+    
+    // Set pagination info
+    collection.setPagination({
+      page,
+      pageSize,
+      totalItems: total,
+      totalPages: Math.ceil(total / pageSize)
+    });
+    
+    // Set applied filters
+    if (Object.keys(filter).length > 0) {
+      collection.setFilters(filter);
+    }
+    
+    // Add items to collection
+    for (const [id, data] of paginatedItems) {
+      const resource = new CognitiveResource({
+        id,
+        type,
+        properties: data
+      });
+      
+      this.enhanceResource(resource);
+      collection.addItem(resource);
+    }
+    
+    // Add collection-level actions
+    collection.addAction("create", {
+      description: `Create a new ${type}`,
+      parameters: this.getCreateParameters(type)
+    });
+    
+    collection.addAction("filter", {
+      description: `Filter ${type} collection`,
+      parameters: this.getFilterParameters(type)
+    });
+    
+    // Add collection-level presentation hints
+    collection.setPresentation({
+      visualization: "list",
+      grouping: `${type}-collection`
+    });
+    
+    // Add collection-level prompts
+    collection.addPrompt({
+      type: "suggestion",
+      text: `Would you like to create a new ${type}?`
+    });
+    
+    if (Object.keys(filter).length > 0) {
+      collection.addPrompt({
+        type: "explanation",
+        text: `These ${type}s are filtered by ${Object.keys(filter).join(", ")}.`
+      });
+    }
+    
+    // Add aggregates if applicable
+    const aggregates = await this.calculateAggregates(type, filteredItems);
+    if (Object.keys(aggregates).length > 0) {
+      collection.setAggregates(aggregates);
+    }
+    
+    return collection;
+  }
+
+  // Update a resource
+  async update(
+    type: string,
+    id: string,
+    data: Record<string, unknown>
+  ): Promise<CognitiveResource> {
+    const key = [type, id];
+    
+    // Get existing data
+    const result = await this.kv.get<Record<string, unknown>>(key);
+    if (!result.value) {
+      throw new Error(`Resource ${type}/${id} not found`);
+    }
+    
+    // Create merged data
+    const updatedData = {
+      ...result.value,
+      ...data,
+      id,
+      updatedAt: new Date().toISOString()
+    };
+    
+    // Handle state transitions if applicable
+    if (data.status && this.stateMachines.has(type)) {
+      const currentState = result.value.status as string;
+      const targetState = data.status as string;
+      
+      if (!this.stateMachines.get(type)!.canTransition(currentState, targetState)) {
+        throw new Error(
+          `Invalid state transition from ${currentState} to ${targetState}`
+        );
+      }
+    }
+    
+    // Update in KV store
+    await this.kv.set(key, updatedData);
+    
+    // Create and enhance resource
+    const resource = new CognitiveResource({
+      id,
+      type,
+      properties: updatedData
+    });
+    
+    this.enhanceResource(resource);
+    
+    return resource;
+  }
+
+  // Delete a resource
+  async delete(type: string, id: string): Promise<void> {
+    const key = [type, id];
+    await this.kv.delete(key);
+  }
+
+  // Perform an action on a resource
+  async performAction(
+    type: string,
+    id: string,
+    action: string,
+    parameters: Record<string, unknown> = {}
+  ): Promise<CognitiveResource> {
+    // Get the resource
+    const resource = await this.get(type, id);
+    if (!resource) {
+      throw new Error(`Resource ${type}/${id} not found`);
+    }
+    
+    // Check if the action exists
+    const actionDef = resource.getAction(action);
+    if (!actionDef) {
+      throw new Error(`Action ${action} not available for ${type}/${id}`);
+    }
+    
+    // Handle standard actions
+    switch (action) {
+      case "delete":
+        await this.delete(type, id);
+        return resource;
+      default:
+        // For state transition actions, determine the target state
+        if (this.stateMachines.has(type)) {
+          const currentState = resource.getProperty("status") as string;
+          const stateMachine = this.stateMachines.get(type)!;
+          
+          // If this action maps to a state transition, perform it
+          const targetState = stateMachine.getTargetState(currentState, action);
+          if (targetState) {
+            return this.update(type, id, {
+              status: targetState,
+              ...parameters
+            });
+          }
+        }
+        
+        // For other actions, just update with the parameters
+        return this.update(type, id, parameters);
+    }
+  }
+
+  // Private helper to enhance a resource with actions, state info, etc.
+  private enhanceResource(resource: CognitiveResource): void {
+    const type = resource.getType();
+    const id = resource.getId();
+    
+    // Add standard actions
+    resource.addAction("update", {
+      description: `Update this ${type}`,
+      parameters: this.getUpdateParameters(type)
+    });
+    
+    resource.addAction("delete", {
+      description: `Delete this ${type}`,
+      confirmation: `Are you sure you want to delete this ${type}?`
+    });
+    
+    // Add state-specific actions if a state machine exists
+    if (this.stateMachines.has(type)) {
+      const currentState = resource.getProperty("status") as string || "default";
+      const stateMachine = this.stateMachines.get(type)!;
+      
+      // Set state information
+      resource.setState({
+        current: currentState,
+        description: stateMachine.getStateDescription(currentState),
+        allowedTransitions: stateMachine.getTransitionsFrom(currentState)
+      });
+      
+      // Add actions for each allowed transition
+      for (const transition of stateMachine.getTransitionsFrom(currentState)) {
+        const targetState = stateMachine.getTargetState(currentState, transition);
+        if (targetState) {
+          resource.addAction(transition, {
+            description: stateMachine.getTransitionDescription(transition),
+            effect: `Changes state from ${currentState} to ${targetState}`
+          });
+        }
+      }
+    }
+    
+    // Add relationships based on foreign keys
+    this.addRelationships(resource);
+    
+    // Add presentation hints
+    this.addPresentationHints(resource);
+    
+    // Add conversation prompts
+    this.addConversationPrompts(resource);
+  }
+
+  // Additional helper methods for filtering, relationship management, etc.
+  private matchesFilter(
+    data: Record<string, unknown>,
+    filter: Record<string, unknown>
+  ): boolean {
+    for (const [key, value] of Object.entries(filter)) {
+      if (data[key] !== value) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private async calculateAggregates(
+    type: string,
+    items: Array<[string, Record<string, unknown>]>
+  ): Promise<Record<string, unknown>> {
+    // Implementation depends on the specific resource type
+    // This is a simple example for task resources
+    if (type === "task") {
+      const statusCounts: Record<string, number> = {};
+      
+      for (const [, data] of items) {
+        const status = data.status as string || "unknown";
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      }
+      
+      return {
+        statusDistribution: statusCounts,
+        totalItems: items.length
+      };
+    }
+    
+    return {};
+  }
+
+  private getCreateParameters(type: string): Record<string, unknown> {
+    // Define parameter schemas for different resource types
+    const parameterSchemas: Record<string, Record<string, unknown>> = {
+      task: {
+        title: {
+          type: "string",
+          description: "Task title",
+          required: true
+        },
+        description: {
+          type: "string",
+          description: "Task description"
+        },
+        status: {
+          type: "string",
+          description: "Initial status",
+          default: "pending",
+          options: ["pending", "in-progress", "completed"]
+        }
+      },
+      // Add schemas for other resource types
+    };
+    
+    return parameterSchemas[type] || {};
+  }
+
+  private getUpdateParameters(type: string): Record<string, unknown> {
+    // Similar to getCreateParameters but for updates
+    // Typically the same parameters but none required
+    return this.getCreateParameters(type);
+  }
+
+  private getFilterParameters(type: string): Record<string, unknown> {
+    // Define filter parameter schemas for different resource types
+    const filterSchemas: Record<string, Record<string, unknown>> = {
+      task: {
+        status: {
+          type: "string",
+          description: "Filter by status",
+          options: ["pending", "in-progress", "completed"]
+        },
+        assignee: {
+          type: "string",
+          description: "Filter by assignee ID"
+        }
+      },
+      // Add schemas for other resource types
+    };
+    
+    return filterSchemas[type] || {};
+  }
+
+  private addRelationships(resource: CognitiveResource): void {
+    const type = resource.getType();
+    const properties = resource.toJSON() as Record<string, unknown>;
+    
+    // Look for foreign keys based on naming conventions
+    for (const [key, value] of Object.entries(properties)) {
+      // Skip system properties
+      if (key.startsWith("_")) continue;
+      
+      // Check for foreign key patterns
+      if (
+        (key.endsWith("Id") || key.endsWith("_id")) && 
+        typeof value === "string"
+      ) {
+        const relationType = key.replace(/Id$|_id$/i, "");
+        const relationId = value as string;
+        
+        // Add the relationship
+        resource.addRelationship(relationType, {
+          type: relationType,
+          id: relationId,
+          // Preview data would typically be loaded from the related resource
+          // This is a simplified example
+          preview: { id: relationId }
+        });
+      }
+    }
+  }
+
+  private addPresentationHints(resource: CognitiveResource): void {
+    const type = resource.getType();
+    
+    // Default presentation hints based on resource type
+    const defaultHints: Record<string, PresentationHints> = {
+      task: {
+        visualization: "card",
+        icon: "task",
+        color: this.getStatusColor(resource.getProperty("status") as string),
+        emphasisProperties: ["dueDate", "assignee"]
+      },
+      // Add hints for other resource types
+    };
+    
+    resource.setPresentation(defaultHints[type] || {});
+  }
+
+  private getStatusColor(status: string): string {
+    // Map statuses to colors
+    const statusColors: Record<string, string> = {
+      pending: "blue",
+      "in-progress": "orange",
+      completed: "green",
+      cancelled: "gray"
+    };
+    
+    return statusColors[status] || "blue";
+  }
+
+  private addConversationPrompts(resource: CognitiveResource): void {
+    const type = resource.getType();
+    const state = resource.getProperty("status") as string;
+    
+    // Add type-specific prompts
+    switch (type) {
+      case "task":
+        if (state === "pending") {
+          resource.addPrompt({
+            type: "follow-up",
+            text: "Would you like to start working on this task now?",
+            priority: "high"
+          });
+        } else if (state === "in-progress") {
+          resource.addPrompt({
+            type: "follow-up",
+            text: "Would you like to mark this task as completed?",
+            priority: "medium"
+          });
+        }
+        
+        resource.addPrompt({
+          type: "suggestion",
+          text: "I can show you other related tasks if you'd like.",
+          priority: "low"
+        });
+        break;
+      
+      // Add prompts for other resource types
+    }
+  }
+}
+```
+
+### 6.4 MCP Bridge
+
+The MCP Bridge connects the Cognitive Hypermedia system to the Model Context Protocol:
+
+```typescript
+class CognitiveMcpBridge {
+  private store: CognitiveStore;
+  private mcp: McpServer;
+
+  constructor(
+    store: CognitiveStore,
+    mcp: McpServer
+  ) {
+    this.store = store;
+    this.mcp = mcp;
+    this.registerTools();
+  }
+
+  private registerTools(): void {
+    this.registerExploreTools();
+    this.registerActionTools();
+    this.registerCreateTools();
+    this.registerSearchTools();
+  }
+
+  private registerExploreTools(): void {
+    this.mcp.tool(
+      "explore",
+      {
+        concept: z.string().describe("Resource type to explore"),
+        id: z.string().optional().describe("Specific resource ID"),
+        filter: z.record(z.any()).optional().describe("Filter criteria"),
+        pagination: z.object({
+          page: z.number().optional(),
+          pageSize: z.number().optional()
+        }).optional().describe("Pagination options"),
+        include: z.array(z.string()).optional().describe("Relationships to include"),
+        view: z.string().optional().describe("Specific view of the resource")
+      },
+      async ({ concept, id, filter, pagination, include, view }) => {
+        try {
+          let result;
+          
+          if (id) {
+            // Fetch specific resource
+            result = await this.store.get(concept, id);
+            
+            if (!result) {
+              return this.createErrorResponse(
+                `Resource ${concept}/${id} not found`,
+                "resource_not_found"
+              );
+            }
+          } else {
+            // Fetch collection
+            result = await this.store.getCollection(concept, {
+              filter,
+              page: pagination?.page,
+              pageSize: pagination?.pageSize
+            });
+          }
+          
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(result.toJSON(), null, 2)
+            }]
+          };
+        } catch (error) {
+          return this.createErrorResponse(
+            `Error exploring ${concept}: ${error.message}`,
+            "exploration_error"
+          );
+        }
+      }
+    );
+  }
+
+  private registerActionTools(): void {
+    this.mcp.tool(
+      "act",
+      {
+        concept: z.string().describe("Resource type"),
+        id: z.string().describe("Resource ID"),
+        action: z.string().describe("Action to perform"),
+        parameters: z.record(z.any()).optional().describe("Action parameters")
+      },
+      async ({ concept, id, action, parameters = {} }) => {
+        try {
+          const result = await this.store.performAction(
+            concept,
+            id,
+            action,
+            parameters
+          );
+          
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(result.toJSON(), null, 2)
+            }]
+          };
+        } catch (error) {
+          return this.createErrorResponse(
+            `Error performing action ${action} on ${concept}/${id}: ${error.message}`,
+            "action_error"
+          );
+        }
+      }
+    );
+  }
+
+  private registerCreateTools(): void {
+    this.mcp.tool(
+      "create",
+      {
+        concept: z.string().describe("Resource type to create"),
+        data: z.record(z.any()).describe("Resource data")
+      },
+      async ({ concept, data }) => {
+        try {
+          const result = await this.store.create(concept, data);
+          
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(result.toJSON(), null, 2)
+            }]
+          };
+        } catch (error) {
+          return this.createErrorResponse(
+            `Error creating ${concept}: ${error.message}`,
+            "creation_error"
+          );
+        }
+      }
+    );
+  }
+
+  private registerSearchTools(): void {
+    this.mcp.tool(
+      "search",
+      {
+        query: z.string().describe("Search query"),
+        concepts: z.array(z.string()).optional().describe("Resource types to search"),
+        limit: z.number().optional().describe("Maximum results to return")
+      },
+      async ({ query, concepts = [], limit = 10 }) => {
+        try {
+          // Implementation would depend on search capabilities
+          // This is a placeholder
+          const results = {
+            _type: "searchResults",
+            query,
+            totalResults: 0,
+            items: []
+          };
+          
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(results, null, 2)
+            }]
+          };
+        } catch (error) {
+          return this.createErrorResponse(
+            `Error searching for "${query}": ${error.message}`,
+            "search_error"
+          );
+        }
+      }
+    );
+  }
+
+  private createErrorResponse(
+    message: string,
+    code: string
+  ): { content: Array<{ type: string; text: string }>; isError: boolean } {
+    const error = {
+      _type: "error",
+      code,
+      message,
+      details: {}
+    };
+    
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify(error, null, 2)
+      }],
+      isError: true
+    };
+  }
+
+  async start(): Promise<void> {
+    // Additional initialization if needed
+  }
+}
+```
+
+### 6.5 State Machine
+
+The state machine component provides a flexible system for modeling and enforcing resource state transitions:
+
+```typescript
+class StateMachine<S extends string, A extends string> {
+  private initialState: S;
+  private states: Map<S, StateDefinition<S, A>> = new Map();
+  private transitions: Map<S, Map<A, S>> = new Map();
+  private transitionDescriptions: Map<A, string> = new Map();
+
+  constructor(initialState: S) {
+    this.initialState = initialState;
+  }
+
+  getInitialState(): S {
+    return this.initialState;
+  }
+
+  // Define a state
+  defineState(
+    state: S,
+    description: string
+  ): StateMachine<S, A> {
+    this.states.set(state, { description });
+    return this;
+  }
+
+  // Define a transition
+  addTransition(
+    fromState: S,
+    action: A,
+    toState: S,
+    description?: string
+  ): StateMachine<S, A> {
+    if (!this.transitions.has(fromState)) {
+      this.transitions.set(fromState, new Map());
+    }
+    
+    this.transitions.get(fromState)!.set(action, toState);
+    
+    if (description) {
+      this.transitionDescriptions.set(action, description);
+    }
+    
+    return this;
+  }
+
+  // Check if transition is valid
+  canTransition(fromState: S, action: A): boolean {
+    return (
+      this.transitions.has(fromState) &&
+      this.transitions.get(fromState)!.has(action)
+    );
+  }
+
+  // Get target state for an action
+  getTargetState(fromState: S, action: A): S | null {
+    if (!this.canTransition(fromState, action)) {
+      return null;
+    }
+    
+    return this.transitions.get(fromState)!.get(action)!;
+  }
+
+  // Get available transitions from a state
+  getTransitionsFrom(state: S): A[] {
+    if (!this.transitions.has(state)) {
+      return [];
+    }
+    
+    return Array.from(this.transitions.get(state)!.keys());
+  }
+
+  // Get state description
+  getStateDescription(state: S): string {
+    return this.states.get(state)?.description || "";
+  }
+
+  // Get transition description
+  getTransitionDescription(action: A): string {
+    return this.transitionDescriptions.get(action) || "";
+  }
+}
+
+interface StateDefinition<S, A> {
+  description: string;
+  onEnter?: (resource: CognitiveResource) => void;
+  onExit?: (resource: CognitiveResource) => void;
+}
+```
+
+Example usage:
+
+```typescript
+// Define a task state machine
+const taskStateMachine = new StateMachine<TaskState, TaskAction>("pending");
+
+taskStateMachine
+  .defineState("pending", "Task is waiting to be started")
+  .defineState("in-progress", "Task is currently being worked on")
+  .defineState("completed", "Task has been finished")
+  .defineState("cancelled", "Task was cancelled")
+  .defineState("paused", "Task is temporarily paused");
+
+taskStateMachine
+  .addTransition("pending", "start", "in-progress", "Start working on this task")
+  .addTransition("pending", "cancel", "cancelled", "Cancel this task")
+  .addTransition("in-progress", "complete", "completed", "Mark this task as completed")
+  .addTransition("in-progress", "pause", "paused", "Pause work on this task")
+  .addTransition("in-progress", "cancel", "cancelled", "Cancel this task")
+  .addTransition("paused", "resume", "in-progress", "Resume working on this task")
+  .addTransition("paused", "cancel", "cancelled", "Cancel this task");
+
+// Register with the store
+cognitiveStore.registerStateMachine("task", taskStateMachine);
+```
+
+### 6.6 Main Application
+
+The main application ties all components together:
+
+```typescript
+import { McpServer } from "npm:@modelcontextprotocol/sdk@1.8.0/server/mcp.js";
+import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk@1.8.0/server/stdio.js";
+
+async function main() {
+  // Get KV path from command line args
+  const DENO_KV_PATH = Deno.args[0] || ":memory:";
+  
+  // Open KV store
+  const kv = await Deno.openKv(DENO_KV_PATH);
+  
+  // Initialize store with state machines
+  const store = new CognitiveStore(kv);
+  
+  // Register task state machine
+  const taskStateMachine = new StateMachine<TaskState, TaskAction>("pending");
+  // Configure state machine as shown above
+  store.registerStateMachine("task", taskStateMachine);
+  
+  // Create MCP server
+  const mcp = new McpServer({
+    name: "cognitive-hypermedia",
+    version: "1.0.0"
+  });
+  
+  // Create MCP bridge
+  const bridge = new CognitiveMcpBridge(store, mcp);
+  
+  // Connect to transport
+  const transport = new StdioServerTransport();
+  await mcp.connect(transport);
+  
+  console.error("Cognitive Hypermedia MCP server started");
+}
+
+// Run the application
+await main();
+```
+
+## 7. Practical Applications
+
+This section explores practical applications of Cognitive Hypermedia through concrete examples.
+
+### 7.1 Task Management System
+
+A task management system is a natural fit for Cognitive Hypermedia. Here's how it would be implemented:
+
+#### 7.1.1 Resource Types
+
+**Task Resource:**
+```json
+{
+  "_id": "task-123",
+  "_type": "task",
+  "title": "Implement Cognitive Hypermedia",
+  "description": "Create a working implementation of the specification",
+  "status": "in-progress",
+  "priority": "high",
+  "dueDate": "2025-05-01",
+  "estimatedHours": 8,
+  "completedHours": 3,
+  "createdAt": "2025-04-01T12:00:00Z",
+  "updatedAt": "2025-04-02T14:30:00Z",
+  
+  "_state": {
+    "current": "in-progress",
+    "description": "This task is actively being worked on",
+    "allowedTransitions": ["complete", "pause", "cancel"]
+  },
+  
+  "_actions": {
+    "complete": {
+      "description": "Mark this task as completed",
+      "effect": "Changes status to completed",
+      "parameters": {
+        "completionNotes": { 
+          "type": "string",
+          "description": "Notes about the completion",
+          "required": false
+        }
+      }
+    },
+    "pause": {
+      "description": "Temporarily pause work on this task",
+      "effect": "Changes status to paused"
+    },
+    "cancel": {
+      "description": "Cancel this task",
+      "effect": "Changes status to cancelled",
+      "confirmation": "Are you sure you want to cancel this task?"
+    },
+    "update": {
+      "description": "Update task details",
+      "parameters": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "priority": { 
+          "type": "string",
+          "options": ["low", "medium", "high"]
+        },
+        "dueDate": { "type": "string" },
+        "estimatedHours": { "type": "number" }
+      }
+    }
+  },
+  
+  "_relationships": {
+    "assignee": {
+      "type": "user",
+      "id": "user-456",
+      "preview": {
+        "name": "Jane Smith",
+        "email": "jane@example.com"
+      }
+    },
+    "project": {
+      "type": "project",
+      "id": "project-789",
+      "preview": {
+        "name": "BALAUR Framework",
+        "status": "active"
+      }
+    },
+    "subtasks": {
+      "type": "task",
+      "cardinality": "many",
+      "preview": {
+        "count": 3,
+        "incomplete": 2
+      }
+    }
+  },
+  
+  "_presentation": {
+    "priority": "high",
+    "visualization": "card",
+    "icon": "task",
+    "color": "orange",
+    "grouping": "in-progress",
+    "emphasisProperties": ["dueDate", "priority"],
+    "progressIndicator": {
+      "type": "percentage",
+      "value": 38,
+      "label": "38% complete"
+    }
+  },
+  
+  "_prompts": [
+    {
+      "type": "follow-up",
+      "text": "Would you like to mark this task as completed?",
+      "priority": "medium"
+    },
+    {
+      "type": "follow-up",
+      "text": "Would you like to see the subtasks for this task?",
+      "priority": "medium"
+    },
+    {
+      "type": "suggestion",
+      "text": "I can show you other tasks in the same project."
+    }
+  ]
+}
+```
+
+**Task Collection:**
+```json
+{
+  "_id": "tasks-collection",
+  "_type": "collection",
+  "itemType": "task",
+  "items": [
+    /* Task resources */
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 10,
+    "totalItems": 24,
+    "totalPages": 3
+  },
+  "filters": {
+    "status": "active",
+    "assignee": "user-456"
+  },
+  "aggregates": {
+    "completionPercentage": 42,
+    "statusDistribution": {
+      "pending": 8,
+      "in-progress": 6,
+      "completed": 10
+    }
+  },
+  "_actions": {
+    "create": {
+      "description": "Create a new task",
+      "parameters": {
+        "title": { "type": "string", "required": true },
+        "description": { "type": "string" },
+        "priority": { 
+          "type": "string", 
+          "options": ["low", "medium", "high"],
+          "default": "medium"
+        },
+        "dueDate": { "type": "string" },
+        "estimatedHours": { "type": "number" },
+        "assignee": { "type": "string" }
+      }
+    },
+    "filter": {
+      "description": "Filter tasks",
+      "parameters": {
+        "status": { 
+          "type": "string", 
+          "options": ["pending", "in-progress", "paused", "completed", "cancelled", "all"]
+        },
+        "assignee": { "type": "string" },
+        "project": { "type": "string" },
+        "priority": { 
+          "type": "string", 
+          "options": ["low", "medium", "high"]
+        }
+      }
+    },
+    "sort": {
+      "description": "Sort tasks",
+      "parameters": {
+        "by": { 
+          "type": "string", 
+          "options": ["dueDate", "priority", "title", "createdAt", "updatedAt"],
+          "required": true
+        },
+        "direction": { 
+          "type": "string", 
+          "options": ["asc", "desc"],
+          "default": "asc"
+        }
+      }
+    }
+  },
+  "_presentation": {
+    "visualization": "list",
+    "grouping": "byStatus"
+  }
+}
+```
+
+#### 7.1.2 Conversation Flow
+
+Here's an example conversation flow using Cognitive Hypermedia for task management:
+
+1. **User**: "Show me my tasks"
+
+2. **LLM** calls:
+   ```typescript
+   explore({
+     concept: "task",
+     filter: { assignee: "user-456" }
+   });
+   ```
+
+3. **System** returns a task collection with current tasks
+
+4. **LLM**: "I found 6 tasks assigned to you. 2 are pending, 3 are in progress, and 1 is completed. Would you like to focus on your in-progress tasks?"
+
+5. **User**: "Yes, show me what I'm currently working on"
+
+6. **LLM** calls:
+   ```typescript
+   explore({
+     concept: "task",
+     filter: { assignee: "user-456", status: "in-progress" }
+   });
+   ```
+
+7. **System** returns filtered collection
+
+8. **LLM**: "You have 3 tasks in progress. The highest priority one is 'Implement Cognitive Hypermedia' which is due on May 1st. Would you like more details on this task?"
+
+9. **User**: "Yes, tell me more about that one"
+
+10. **LLM** calls:
+    ```typescript
+    explore({
+      concept: "task",
+      id: "task-123"
+    });
+    ```
+
+11. **System** returns detailed task resource
+
+12. **LLM**: "The 'Implement Cognitive Hypermedia' task is currently in progress. It's a high priority task due on May 1st, 2025. You've logged 3 out of an estimated 8 hours, so it's about 38% complete. It's part of the BALAUR Framework project. Would you like to mark this task as completed or see its subtasks?"
+
+13. **User**: "I've finished it, mark it as complete"
+
+14. **LLM** calls:
+    ```typescript
+    act({
+      concept: "task",
+      id: "task-123",
+      action: "complete",
+      parameters: {
+        completionNotes: "Implemented all core components"
+      }
+    });
+    ```
+
+15. **System** returns updated task with new state
+
+16. **LLM**: "I've marked 'Implement Cognitive Hypermedia' as completed. Great job! Would you like to see your next pending task, or go back to all your tasks?"
+
+This conversation demonstrates how Cognitive Hypermedia enables natural task management through conversation, with the LLM using the provided actions, presentation hints, and conversation prompts to guide the interaction.
+
+### 7.2 E-commerce Product Catalog
+
+An e-commerce product catalog provides another example of Cognitive Hypermedia in action:
+
+#### 7.2.1 Resource Types
+
+**Product Resource:**
+```json
+{
+  "_id": "product-123",
+  "_type": "product",
+  "name": "Wireless Noise-Cancelling Headphones",
+  "description": "Premium wireless headphones with active noise cancellation",
+  "price": 249.99,
+  "currency": "USD",
+  "status": "in-stock",
+  "inventory": 42,
+  "rating": 4.7,
+  "reviewCount": 128,
+  
+  "_state": {
+    "current": "in-stock",
+    "description": "This product is available for purchase",
+    "allowedTransitions": []
+  },
+  
+  "_actions": {
+    "addToCart": {
+      "description": "Add this product to your shopping cart",
+      "parameters": {
+        "quantity": {
+          "type": "number",
+          "description": "Quantity to add",
+          "required": true,
+          "default": 1,
+          "min": 1,
+          "max": 42
+        }
+      }
+    },
+    "addToWishlist": {
+      "description": "Add this product to your wishlist"
+    },
+    "writeReview": {
+      "description": "Write a review for this product",
+      "parameters": {
+        "rating": {
+          "type": "number",
+          "description": "Rating (1-5 stars)",
+          "required": true,
+          "min": 1,
+          "max": 5
+        },
+        "title": {
+          "type": "string",
+          "description": "Review title",
+          "required": true
+        },
+        "content": {
+          "type": "string",
+          "description": "Review content",
+          "required": true
+        }
+      }
+    }
+  },
+  
+  "_relationships": {
+    "category": {
+      "type": "category",
+      "id": "category-456",
+      "preview": {
+        "name": "Audio",
+        "productCount": 38
+      }
+    },
+    "brand": {
+      "type": "brand",
+      "id": "brand-789",
+      "preview": {
+        "name": "SoundMax",
+        "logo": "soundmax-logo"
+      }
+    },
+    "relatedProducts": {
+      "type": "product",
+      "cardinality": "many",
+      "preview": {
+        "count": 5
+      }
+    },
+    "reviews": {
+      "type": "review",
+      "cardinality": "many",
+      "preview": {
+        "count": 128,
+        "averageRating": 4.7
+      }
+    }
+  },
+  
+  "_presentation": {
+    "visualization": "productCard",
+    "icon": "headphones",
+    "color": "blue",
+    "emphasisProperties": ["price", "rating"],
+    "imagePriority": "high"
+  },
+  
+  "_prompts": [
+    {
+      "type": "suggestion",
+      "text": "Would you like to add this to your cart?",
+      "priority": "high"
+    },
+    {
+      "type": "follow-up",
+      "text": "Would you like to see reviews for this product?",
+      "priority": "medium"
+    },
+    {
+      "type": "follow-up",
+      "text": "Should I show you related products?",
+      "priority": "medium"
+    }
+  ]
+}
+```
+
+**Product Collection:**
+```json
+{
+  "_id": "products-collection",
+  "_type": "collection",
+  "itemType": "product",
+  "items": [
+    /* Product resources */
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 10,
+    "totalItems": 38,
+    "totalPages": 4
+  },
+  "filters": {
+    "category": "category-456",
+    "priceRange": { "min": 100, "max": 300 }
+  },
+  "aggregates": {
+    "priceRange": { "min": 49.99, "max": 499.99 },
+    "averageRating": 4.5,
+    "brandDistribution": {
+      "SoundMax": 12,
+      "AudioPro": 8,
+      "Other": 18
+    }
+  },
+  "_actions": {
+    "filter": {
+      "description": "Filter products",
+      "parameters": {
+        "category": { "type": "string" },
+        "brand": { "type": "string" },
+        "priceRange": {
+          "type": "object",
+          "properties": {
+            "min": { "type": "number" },
+            "max": { "type": "number" }
+          }
+        },
+        "inStock": { "type": "boolean" },
+        "minRating": { "type": "number" }
+      }
+    },
+    "sort": {
+      "description": "Sort products",
+      "parameters": {
+        "by": {
+          "type": "string",
+          "options": ["price", "rating", "newest", "bestselling"],
+          "required": true
+        },
+        "direction": {
+          "type": "string",
+          "options": ["asc", "desc"],
+          "default": "asc"
+        }
+      }
+    }
+  },
+  "_presentation": {
+    "visualization": "productGrid",
+    "grouping": "byCategory"
+  },
+  "_prompts": [
+    {
+      "type": "suggestion",
+      "text": "You can filter these products by price range or brand."
+    },
+    {
+      "type": "follow-up",
+      "text": "Would you like to see more details about any of these products?"
+    }
+  ]
+}
+```
+
+#### 7.2.2 Conversation Flow
+
+Here's an example conversation for e-commerce product browsing:
+
+1. **User**: "I'm looking for wireless headphones"
+
+2. **LLM** calls:
+   ```typescript
+   explore({
+     concept: "product",
+     filter: { category: "headphones", wireless: true }
+   });
+   ```
+
+3. **System** returns product collection
+
+4. **LLM**: "I found 15 wireless headphones. Prices range from $49.99 to $499.99. Would you like to filter by price range or see the top-rated options?"
+
+5. **User**: "Show me options under $300 with good noise cancellation"
+
+6. **LLM** calls:
+   ```typescript
+   explore({
+     concept: "product",
+     filter: {
+       category: "headphones",
+       wireless: true,
+       priceRange: { max: 300 },
+       features: "noise-cancellation"
+     }
+   });
+   ```
+
+7. **System** returns filtered collection
+
+8. **LLM**: "Here are 5 wireless noise-cancelling headphones under $300. The highest rated option is the SoundMax Wireless Noise-Cancelling Headphones for $249.99, with 4.7 stars from 128 reviews. Would you like more details about these headphones?"
+
+9. **User**: "Yes, tell me more about those"
+
+10. **LLM** calls:
+    ```typescript
+    explore({
+      concept: "product",
+      id: "product-123"
+    });
+    ```
+
+11. **System** returns detailed product resource
+
+12. **LLM**: "The SoundMax Wireless Noise-Cancelling Headphones are premium headphones with active noise cancellation. They're priced at $249.99 and currently in stock. They have an excellent rating of 4.7 stars from 128 reviews. Would you like to add these to your cart, see reviews, or check out related products?"
+
+13. **User**: "How many are in stock, and can I see some reviews?"
+
+14. **LLM** (using embedded information): "There are 42 units currently in stock. Let me show you some reviews."
+
+15. **LLM** calls:
+    ```typescript
+    explore({
+      concept: "review",
+      filter: { product: "product-123" },
+      pagination: { page: 1, pageSize: 5 }
+    });
+    ```
+
+16. **System** returns review collection
+
+17. **LLM**: "Here are some top reviews for the SoundMax headphones: [reviews]. Would you like to add these headphones to your cart?"
+
+18. **User**: "Yes, I'll take one pair"
+
+19. **LLM** calls:
+    ```typescript
+    act({
+      concept: "product",
+      id: "product-123",
+      action: "addToCart",
+      parameters: {
+        quantity: 1
+      }
+    });
+    ```
+
+20. **System** returns cart update confirmation
+
+21. **LLM**: "I've added one pair of SoundMax Wireless Noise-Cancelling Headphones to your cart. The total is $249.99. Would you like to continue shopping or proceed to checkout?"
+
+This example demonstrates how Cognitive Hypermedia enables natural product browsing and purchasing, with the LLM leveraging the rich resource representations to guide the user through the shopping experience.
+
+## 8. Comparing with Existing Approaches
+
+Cognitive Hypermedia offers distinct advantages over existing approaches to LLM-system integration. This section compares it with alternative methods.
+
+### 8.1 Cognitive Hypermedia vs. Traditional REST APIs
+
+| Aspect | Traditional REST APIs | Cognitive Hypermedia |
+|--------|----------------------|---------------------|
+| **Navigation Model** | URL-centric with predefined endpoints | Concept-oriented with dynamic discovery |
+| **State Representation** | Implicit, often through status codes or properties | Explicit, with current state and available transitions clearly defined |
+| **Action Discovery** | Requires documentation or out-of-band knowledge | Self-documenting through resource-embedded actions |
+| **Context Efficiency** | Often verbose with standardized but repetitive structure | Optimized for context window usage with prioritized information |
+| **Conversation Support** | None; LLMs must determine appropriate follow-ups independently | Explicit prompts guide conversation flow naturally |
+| **Presentation Guidance** | None; LLMs must infer appropriate visualizations | Built-in hints guide consistent UI generation |
+| **Error Handling** | Often technical and implementation-focused | User-oriented with recovery suggestions and prompts |
+| **Relationship Modeling** | Typically through hyperlinks or nested resources | Conceptual relationships with preview data |
+
+Traditional REST APIs force LLMs to understand URL structures and HTTP verbs, using valuable context window space for boilerplate and repetitive syntax. Cognitive Hypermedia aligns with how LLMs naturally process information, resulting in more efficient interactions and better user experiences.
+
+### 8.2 Cognitive Hypermedia vs. GraphQL
+
+| Aspect | GraphQL | Cognitive Hypermedia |
+|--------|---------|---------------------|
+| **Query Model** | Client-specified fields and relationships | Server-provided complete resources with context optimization |
+| **State Transitions** | No built-in state transition model | Explicit state machine with clear transition paths |
+| **Action Definition** | Mutations defined by schema, no built-in semantics | Resource-specific actions with clear descriptions and effects |
+| **Self-Documentation** | Schema-based, requires introspection queries | Resource-embedded, available directly in responses |
+| **Conversation Support** | None; LLMs must determine prompts independently | Built-in conversation prompts for natural dialogue |
+| **Presentation Guidance** | None; visualization left entirely to clients | Explicit presentation hints for consistent UIs |
+| **Resource Discovery** | Root query types, no hypermedia controls | Resource-embedded relationships and actions |
+| **Context Efficiency** | Client can minimize response size but requires query expertise | Server optimizes response content automatically |
+
+While GraphQL offers powerful querying capabilities, it lacks the hypermedia controls and conversation guidance that make Cognitive Hypermedia especially well-suited for LLM interactions. GraphQL also requires LLMs to construct often complex query strings, while Cognitive Hypermedia provides resources in a ready-to-use format.
+
+### 8.3 Cognitive Hypermedia vs. Traditional HATEOAS
+
+| Aspect | Traditional HATEOAS | Cognitive Hypermedia |
+|--------|---------------------|---------------------|
+| **Linking Model** | URI-based links with HTTP methods | Concept-oriented actions with semantic descriptions |
+| **Client Knowledge** | Requires understanding of link relation semantics | Natural understanding through clear action descriptions |
+| **State Representation** | Often implicit through available links | Explicit state with descriptions and transitions |
+| **Media Type** | Often application/hal+json or similar | Optimized format for LLM consumption |
+| **Conversation Support** | None; client determines interaction flow | Built-in prompts guide natural conversation |
+| **Presentation Guidance** | None; presentation left to clients | Explicit hints for consistent UI generation |
+| **Context Efficiency** | Often verbose link structures | Optimized representations for context windows |
+| **Relationship Modeling** | Typically through link relations or embedded resources | Conceptual relationships with preview data |
+
+Traditional HATEOAS approaches like HAL or Siren were designed for human developers and web browsers, not LLMs. Cognitive Hypermedia adapts these principles specifically for LLM consumption, creating a more natural and efficient hypermedia experience.
+
+### 8.4 Cognitive Hypermedia vs. RPC Approaches
+
+| Aspect | RPC Approaches | Cognitive Hypermedia |
+|--------|---------------|---------------------|
+| **Interaction Model** | Function-oriented with predetermined operations | Resource-oriented with discoverable actions |
+| **State Awareness** | Typically stateless with no built-in state tracking | Explicit state representation and transitions |
+| **Self-Documentation** | Often requires separate API specs | Self-documenting through resource structure |
+| **Resource Discovery** | Not inherently discoverable | Resources contain relationships and actions |
+| **Context Continuity** | Each call typically independent | Resources maintain context across interactions |
+| **Conversation Support** | None; clients determine follow-ups | Built-in prompts for natural dialogue flow |
+| **Error Recovery** | Typically technical error responses | User-oriented errors with recovery suggestions |
+| **Scaling Complexity** | Grows linearly with function count | Resource composition provides natural organization |
+
+RPC approaches like gRPC, JSON-RPC, or OpenAPI-based function calling provide function-oriented interfaces that don't align well with how LLMs process information. They require LLMs to know available operations in advance and provide little guidance on appropriate sequence or context.
+
+Cognitive Hypermedia's resource-oriented approach naturally guides LLMs through possible actions, maintaining context and state across interactions. This results in more natural, coherent conversations and reduces the likelihood of LLMs attempting invalid operations.
+
+### 8.5 When to Use Cognitive Hypermedia
+
+Cognitive Hypermedia is particularly well-suited for:
+
+1. **Conversational interfaces** where LLMs mediate between users and systems
+2. **Complex state-driven applications** with clear workflows and transitions
+3. **Resource-oriented domains** like content management, task tracking, or product catalogs
+4. **Applications requiring dynamic adaptation** based on context or state
+5. **Systems where conversation guidance** would improve user experience
+
+While traditional APIs might be simpler for basic CRUD operations or function-oriented tasks, Cognitive Hypermedia provides significant advantages as application complexity grows, especially when state transitions and relationship navigation become important.
+
+## 9. Future Directions
+
+Cognitive Hypermedia represents a foundational approach to LLM-system integration, with several promising directions for future development.
+
+### 9.1 Multi-Modal Extensions
+
+Current Cognitive Hypermedia focuses primarily on text representation, but future extensions could incorporate:
+
+**Image Integration:**
+```json
+"_media": {
+  "images": [
+    {
+      "id": "image-123",
+      "description": "Product front view",
+      "role": "primary",
+      "format": "jpeg",
+      "presentation": {
+        "preferredWidth": 600,
+        "aspectRatio": "4:3"
+      }
+    }
+  ]
+}
+```
+
+**Audio Integration:**
+```json
+"_media": {
+  "audio": [
+    {
+      "id": "audio-456",
+      "description": "Product demonstration",
+      "duration": 120,
+      "format": "mp3"
+    }
+  ]
+}
+```
+
+These extensions would allow LLMs to reference and describe media assets in conversations, enhancing the user experience for visual or audio content.
+
+### 9.2 Adaptive Representation
+
+Future implementations could dynamically adjust resource representations based on:
+
+1. **Conversation Context:** Providing different levels of detail based on the current conversation focus
+2. **User Expertise:** Adapting terminology and explanation depth to user expertise level
+3. **Device Capabilities:** Optimizing presentation for different device types
+4. **Accessibility Needs:** Providing alternative representations for different accessibility requirements
+
+This adaptive representation would further optimize context window usage and improve user experience across different scenarios.
+
+### 9.3 Advanced State Machine Capabilities
+
+Enhanced state machine capabilities could include:
+
+1. **Parallel States:** Resources with multiple simultaneous state dimensions
+2. **Hierarchical States:** Nested state machines for complex workflows
+3. **Guard Conditions:** State transitions dependent on complex conditions
+4. **History States:** Returning to previous states with context preserved
+5. **Event-Driven Transitions:** State changes triggered by external events
+
+These advanced state capabilities would enable Cognitive Hypermedia to represent more complex workflows and business processes.
+
+### 9.4 Collaborative Cognition
+
+A promising direction is supporting collaborative interactions where multiple agents or humans interact with the same resources:
+
+```json
+"_collaboration": {
+  "activeParticipants": [
+    {
+      "id": "user-123",
+      "name": "Jane Smith",
+      "role": "editor",
+      "status": "active",
+      "lastActive": "2025-04-05T14:30:00Z"
+    },
+    {
+      "id": "agent-456",
+      "name": "Research Assistant",
+      "role": "viewer",
+      "status": "active"
+    }
+  ],
+  "actions": {
+    "invite": {
+      "description": "Invite a collaborator",
+      "parameters": {
+        "userId": { "type": "string", "required": true },
+        "role": { 
+          "type": "string", 
+          "options": ["viewer", "editor", "admin"],
+          "required": true
+        }
+      }
+    }
+  }
+}
+```
+
+This extension would enable LLMs to understand collaborative contexts, facilitate multi-user interactions, and support coordination between humans and AI agents.
+
+### 9.5 Standardization Opportunities
+
+Cognitive Hypermedia could benefit from standardization efforts in several areas:
+
+1. **Core Resource Format:** Standardizing the basic structure and extension points
+2. **Action Patterns:** Common patterns for standard operations
+3. **Presentation Vocabulary:** Standardized presentation hints for consistent UI
+4. **State Machine Definition:** Common format for defining resource state machines
+5. **MCP Tool Interfaces:** Standard tool definitions for common operations
+
+Standardization would promote interoperability between different implementations and enable the development of shared tools and libraries.
+
+## 10. Implementation Guide
+
+This section provides practical guidance for implementing Cognitive Hypermedia in your own applications.
+
+### 10.1 Step-by-Step Implementation
+
+#### Step 1: Define Your Resource Model
+
+Begin by identifying the key resources in your domain and their relationships:
+
+1. **Identify Resource Types:** What are the primary entities in your system?
+2. **Define Properties:** What attributes describe each resource?
+3. **Map Relationships:** How do resources relate to each other?
+4. **Identify States:** What states can resources be in?
+5. **Define Transitions:** What actions cause state changes?
+
+Example resource model for a document management system:
+
+```typescript
+// Resource types
+const resourceTypes = [
+  "document",
+  "folder",
+  "tag",
+  "user",
+  "comment"
+];
+
+// Document resource properties
+const documentProperties = [
+  { name: "title", type: "string", required: true },
+  { name: "content", type: "string" },
+  { name: "status", type: "string", options: ["draft", "published", "archived"] },
+  { name: "createdAt", type: "datetime", readonly: true },
+  { name: "updatedAt", type: "datetime", readonly: true }
+];
+
+// Document relationships
+const documentRelationships = [
+  { name: "author", type: "user", cardinality: "one" },
+  { name: "folder", type: "folder", cardinality: "one" },
+  { name: "tags", type: "tag", cardinality: "many" },
+  { name: "comments", type: "comment", cardinality: "many" }
+];
+
+// Document state machine
+const documentStates = [
+  "draft",
+  "submitted",
+  "published",
+  "archived"
+];
+
+const documentTransitions = [
+  { from: "draft", action: "submit", to: "submitted" },
+  { from: "submitted", action: "publish", to: "published" },
+  { from: "submitted", action: "reject", to: "draft" },
+  { from: "published", action: "archive", to: "archived" },
+  { from: "archived", action: "restore", to: "draft" }
+];
+```
+
+#### Step 2: Create Resource Classes
+
+Implement classes that represent your resources according to the Cognitive Hypermedia format:
+
+```typescript
+class DocumentResource extends CognitiveResource {
+  constructor(id: string, data: Record<string, unknown>) {
+    super({
+      id,
+      type: "document",
+      properties: data
+    });
+    
+    // Initialize with appropriate state
+    this.setState({
+      current: data.status as string || "draft",
+      description: this.getStateDescription(data.status as string || "draft"),
+      allowedTransitions: this.getAllowedTransitions(data.status as string || "draft")
+    });
+  }
+  
+  private getStateDescription(state: string): string {
+    const descriptions: Record<string, string> = {
+      "draft": "This document is a work in progress",
+      "submitted": "This document is awaiting review",
+      "published": "This document is published and visible",
+      "archived": "This document is archived"
+    };
+    
+    return descriptions[state] || "Unknown state";
+  }
+  
+  private getAllowedTransitions(state: string): string[] {
+    const transitions: Record<string, string[]> = {
+      "draft": ["submit"],
+      "submitted": ["publish", "reject"],
+      "published": ["archive"],
+      "archived": ["restore"]
+    };
+    
+    return transitions[state] || [];
+  }
+  
+  // Enhance with actions, relationships, etc.
+  enhance(): DocumentResource {
+    this.addStandardActions();
+    this.addStateTransitionActions();
+    this.addRelationships();
+    this.addPresentationHints();
+    this.addConversationPrompts();
+    
+    return this;
+  }
+  
+  private addStandardActions(): void {
+    // Add standard CRUD actions
+    this.addAction("update", {
+      description: "Update this document",
+      parameters: {
+        title: { type: "string" },
+        content: { type: "string" }
+      }
+    });
+    
+    this.addAction("delete", {
+      description: "Delete this document",
+      confirmation: "Are you sure you want to delete this document?"
+    });
+  }
+  
+  private addStateTransitionActions(): void {
+    const state = this.getProperty("status") as string || "draft";
+    
+    // Add state-specific actions
+    switch (state) {
+      case "draft":
+        this.addAction("submit", {
+          description: "Submit this document for review",
+          effect: "Changes status to submitted"
+        });
+        break;
+      
+      case "submitted":
+        this.addAction("publish", {
+          description: "Publish this document",
+          effect: "Changes status to published"
+        });
+        
+        this.addAction("reject", {
+          description: "Reject this document",
+          effect: "Changes status to draft",
+          parameters: {
+            reason: {
+              type: "string",
+              description: "Reason for rejection",
+              required: true
+            }
+          }
+        });
+        break;
+      
+      case "published":
+        this.addAction("archive", {
+          description: "Archive this document",
+          effect: "Changes status to archived"
+        });
+        break;
+      
+      case "archived":
+        this.addAction("restore", {
+          description: "Restore this document",
+          effect: "Changes status to draft"
+        });
+        break;
+    }
+  }
+  
+  private addRelationships(): void {
+    // Add author relationship if it exists
+    const authorId = this.getProperty("authorId") as string;
+    if (authorId) {
+      this.addRelationship("author", {
+        type: "user",
+        id: authorId,
+        preview: {
+          // In a real implementation, this would be loaded from the user resource
+          name: "Unknown User"
+        }
+      });
+    }
+    
+    // Add folder relationship if it exists
+    const folderId = this.getProperty("folderId") as string;
+    if (folderId) {
+      this.addRelationship("folder", {
+        type: "folder",
+        id: folderId,
+        preview: {
+          // In a real implementation, this would be loaded from the folder resource
+          name: "Unknown Folder"
+        }
+      });
+    }
+    
+    // Add links to related resources
+    this.addRelationship("comments", {
+      type: "comment",
+      cardinality: "many",
+      preview: {
+        count: 0 // In a real implementation, this would be the actual count
+      }
+    });
+  }
+  
+  private addPresentationHints(): void {
+    const status = this.getProperty("status") as string;
+    
+    this.setPresentation({
+      visualization: "document",
+      icon: "document",
+      color: this.getStatusColor(status),
+      emphasisProperties: ["title", "status", "updatedAt"]
+    });
+  }
+  
+  private getStatusColor(status: string): string {
+    const colors: Record<string, string> = {
+      "draft": "gray",
+      "submitted": "blue",
+      "published": "green",
+      "archived": "purple"
+    };
+    
+    return colors[status] || "gray";
+  }
+  
+  private addConversationPrompts(): void {
+    const status = this.getProperty("status") as string;
+    
+    // Add status-specific prompts
+    switch (status) {
+      case "draft":
+        this.addPrompt({
+          type: "follow-up",
+          text: "Would you like to submit this document for review?",
+          priority: "medium"
+        });
+        break;
+      
+      case "submitted":
+        this.addPrompt({
+          type: "follow-up",
+          text: "Would you like to publish or reject this document?",
+          priority: "high"
+        });
+        break;
+      
+      case "published":
+        this.addPrompt({
+          type: "suggestion",
+          text: "You can see how many people have viewed this document."
+        });
+        break;
+    }
+    
+    // Add general prompts
+    this.addPrompt({
+      type: "suggestion",
+      text: "I can show you comments on this document if you'd like.",
+      priority: "low"
+    });
+  }
+}
+```
+
+#### Step 3: Implement Your MCP Tools
+
+Create MCP tools that implement the Cognitive Hypermedia interaction pattern:
+
+```typescript
+// Import MCP SDK
+import { McpServer } from "npm:@modelcontextprotocol/sdk@1.8.0/server/mcp.js";
+import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk@1.8.0/server/stdio.js";
+import { z } from "npm:zod@3.24.2";
+
+// Create MCP server
+const mcp = new McpServer({
+  name: "document-management",
+  version: "1.0.0"
+});
+
+// Register the explore tool
+mcp.tool(
+  "explore",
+  {
+    concept: z.string().describe("Resource type to explore"),
+    id: z.string().optional().describe("Specific resource ID"),
+    filter: z.record(z.any()).optional().describe("Filter criteria"),
+    pagination: z.object({
+      page: z.number().optional(),
+      pageSize: z.number().optional()
+    }).optional().describe("Pagination options")
+  },
+  async ({ concept, id, filter, pagination }) => {
+    try {
+      let result;
+      
+      if (id) {
+        // Fetch specific resource
+        result = await documentStore.get(concept, id);
+        
+        if (!result) {
+          return createErrorResponse(
+            `Resource ${concept}/${id} not found`,
+            "resource_not_found"
+          );
+        }
+      } else {
+        // Fetch collection
+        result = await documentStore.getCollection(concept, {
+          filter,
+          page: pagination?.page,
+          pageSize: pagination?.pageSize
+        });
+      }
+      
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result.toJSON(), null, 2)
+        }]
+      };
+    } catch (error) {
+      return createErrorResponse(
+        `Error exploring ${concept}: ${error.message}`,
+        "exploration_error"
+      );
+    }
+  }
+);
+
+// Register the act tool
+mcp.tool(
+  "act",
+  {
+    concept: z.string().describe("Resource type"),
+    id: z.string().describe("Resource ID"),
+    action: z.string().describe("Action to perform"),
+    parameters: z.record(z.any()).optional().describe("Action parameters")
+  },
+  async ({ concept, id, action, parameters = {} }) => {
+    try {
+      const result = await documentStore.performAction(
+        concept,
+        id,
+        action,
+        parameters
+      );
+      
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result.toJSON(), null, 2)
+        }]
+      };
+    } catch (error) {
+      return createErrorResponse(
+        `Error performing action ${action} on ${concept}/${id}: ${error.message}`,
+        "action_error"
+      );
+    }
+  }
+);
+
+// Register the create tool
+mcp.tool(
+  "create",
+  {
+    concept: z.string().describe("Resource type to create"),
+    data: z.record(z.any()).describe("Resource data")
+  },
+  async ({ concept, data }) => {
+    try {
+      const result = await documentStore.create(concept, data);
+      
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result.toJSON(), null, 2)
+        }]
+      };
+    } catch (error) {
+      return createErrorResponse(
+        `Error creating ${concept}: ${error.message}`,
+        "creation_error"
+      );
+    }
+  }
+);
+
+// Helper function for error responses
+function createErrorResponse(
+  message: string,
+  code: string
+): { content: Array<{ type: string; text: string }>; isError: boolean } {
+  const error = {
+    _type: "error",
+    code,
+    message,
+    details: {}
+  };
+  
+  return {
+    content: [{
+      type: "text",
+      text: JSON.stringify(error, null, 2)
+    }],
+    isError: true
+  };
+}
+```
+
+#### Step 4: Create Your Data Store
+
+Implement a storage system for your resources, leveraging Deno KV:
+
+```typescript
+class DocumentStore {
+  private kv: Deno.Kv;
+  
+  constructor(kv: Deno.Kv) {
+    this.kv = kv;
+  }
+  
+  async create(
+    type: string,
+    data: Record<string, unknown>
+  ): Promise<CognitiveResource> {
+    const id = data.id as string || crypto.randomUUID();
+    const key = [type, id];
+    
+    // Add timestamps
+    const resourceData = {
+      ...data,
+      id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    // Store in KV
+    await this.kv.set(key, resourceData);
+    
+    // Create appropriate resource type
+    let resource: CognitiveResource;
+    
+    switch (type) {
+      case "document":
+        resource = new DocumentResource(id, resourceData);
+        break;
+      // Add cases for other resource types
+      default:
+        resource = new CognitiveResource({
+          id,
+          type,
+          properties: resourceData
+        });
+    }
+    
+    // Enhance the resource with appropriate extensions
+    if (resource instanceof DocumentResource) {
+      resource.enhance();
+    } else {
+      // Apply basic enhancements for other resource types
+      this.enhanceResource(resource);
+    }
+    
+    return resource;
+  }
+  
+  async get(
+    type: string,
+    id: string
+  ): Promise<CognitiveResource | null> {
+    const key = [type, id];
+    const result = await this.kv.get<Record<string, unknown>>(key);
+    
+    if (!result.value) {
+      return null;
+    }
+    
+    // Create appropriate resource type
+    let resource: CognitiveResource;
+    
+    switch (type) {
+      case "document":
+        resource = new DocumentResource(id, result.value);
+        break;
+      // Add cases for other resource types
+      default:
+        resource = new CognitiveResource({
+          id,
+          type,
+          properties: result.value
+        });
+    }
+    
+    // Enhance the resource with appropriate extensions
+    if (resource instanceof DocumentResource) {
+      resource.enhance();
+    } else {
+      // Apply basic enhancements for other resource types
+      this.enhanceResource(resource);
+    }
+    
+    return resource;
+  }
+  
+  // Implement other methods (update, delete, collection, etc.)
+  // ...
+  
+  private enhanceResource(resource: CognitiveResource): void {
+    // Add basic actions and links for generic resources
+    resource.addAction("update", {
+      description: `Update this ${resource.getType()}`,
+      parameters: {}
+    });
+    
+    resource.addAction("delete", {
+      description: `Delete this ${resource.getType()}`
+    });
+  }
+}
+```
+
+#### Step 5: Connect Everything Together
+
+Create the main application that ties all components together:
+
+```typescript
+import { McpServer } from "npm:@modelcontextprotocol/sdk@1.8.0/server/mcp.js";
+import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk@1.8.0/server/stdio.js";
+
+async function main() {
+  // Get KV path from command line args
+  const DENO_KV_PATH = Deno.args[0] || ":memory:";
+  
+  // Open KV store
+  const kv = await Deno.openKv(DENO_KV_PATH);
+  
+  // Create document store
+  const documentStore = new DocumentStore(kv);
+  
+  // Create MCP server
+  const mcp = new McpServer({
+    name: "document-management",
+    version: "1.0.0"
+  });
+  
+  // Register MCP tools
+  registerMcpTools(mcp, documentStore);
+  
+  // Connect to transport
+  const transport = new StdioServerTransport();
+  await mcp.connect(transport);
+  
+  console.error("Document management system started");
+}
+
+// Run the application
+await main();
+```
+
+#### Step 6: Test Your Implementation
+
+Test your implementation using the MCP Inspector or Claude Desktop:
+
+1. **Start Your Server:**
+   ```bash
+   deno run --allow-all main.ts
+   ```
+
+2. **Configure Claude Desktop:**
+   Edit `claude_desktop_config.json` to include your server:
+   ```json
+   {
+     "mcpServers": {
+       "document-management": {
+         "command": "deno",
+         "args": [
+           "run",
+           "--allow-all",
+           "main.ts",
+           ":memory:"
+         ]
+       }
+     }
+   }
+   ```
+
+3. **Test with Claude:**
+   Start a conversation and ask Claude to interact with your application.
+
+### 10.2 Best Practices
+
+#### Resource Design
+
+1. **Focus on Core Properties:** Include only essential properties in the main resource representation, with detailed properties available on demand.
+2. **Use Meaningful Types:** Choose resource types that reflect domain concepts clearly.
+3. **Consistent Naming:** Use consistent naming conventions across resources.
+4. **Relationship Previews:** Include enough preview data to mention relationships in conversation.
+5. **Clear State Descriptions:** Provide user-friendly descriptions of resource states.
+
+#### Action Design
+
+1. **User-Centric Descriptions:** Write action descriptions from the user's perspective.
+2. **Clear Effects:** Clearly explain what each action does.
+3. **Appropriate Confirmations:** Include confirmation messages for destructive or important actions.
+4. **Validation in Parameters:** Specify constraints and validation rules in parameter definitions.
+5. **Logical Grouping:** Group related actions together.
+
+#### Conversation Prompts
+
+1. **Context Awareness:** Tailor prompts to the current resource state.
+2. **Natural Language:** Write prompts in natural, conversational language.
+3. **Progressive Disclosure:** Use prompts to guide users through complex processes step by step.
+4. **Priority Levels:** Assign appropriate priority levels to help LLMs choose the most relevant prompts.
+5. **Balanced Suggestions:** Provide helpful suggestions without being overly directive.
+
+#### Presentation Hints
+
+1. **Consistent Visualizations:** Use consistent visualization types across similar resources.
+2. **Appropriate Emphasis:** Emphasize the most important properties for each resource type.
+3. **State-Based Styling:** Adjust colors and icons based on resource state.
+4. **Progressive Detail:** Provide different levels of detail for different contexts.
+5. **Accessibility Awareness:** Include alternatives for visual presentation elements.
+
+#### Error Handling
+
+1. **User-Friendly Messages:** Write error messages that users can understand.
+2. **Recovery Suggestions:** Include suggestions for how to recover from errors.
+3. **Context Preservation:** Ensure errors don't lose conversation context.
+4. **Appropriate Detail:** Include enough detail to address the issue without overwhelming.
+5. **Positive Tone:** Frame errors constructively rather than critically.
+
+### 10.3 Common Pitfalls
+
+1. **Overly Verbose Resources:** Including too much detail in resources, wasting context window space.
+2. **Insufficient State Modeling:** Not clearly representing resource states and transitions.
+3. **Inconsistent Action Patterns:** Using different patterns for similar actions across resources.
+4. **Missing Error Recovery:** Failing to provide guidance on how to recover from errors.
+5. **Technical Language:** Using implementation-specific terminology in user-facing elements.
+6. **Overengineering:** Adding unnecessary complexity to resource representations.
+7. **Insufficient Testing:** Not testing with real conversations to verify usability.
+
+## 11. Conclusion
+
+Cognitive Hypermedia represents a significant advancement in how we design interfaces between LLMs and systems. By adapting established hypermedia principles to the unique characteristics of LLMs, it creates a more natural, efficient, and powerful integration pattern.
+
+The key innovations of Cognitive Hypermedia address fundamental challenges in LLM-system interaction:
+
+1. **Context Efficiency:** Optimized resource representations that make the most of limited context windows
+2. **Conceptual Navigation:** Alignment with how LLMs naturally process and navigate information
+3. **Explicit State:** Clear representation of system state and available transitions
+4. **Conversation Guidance:** Built-in prompts that help LLMs maintain natural dialogue flow
+5. **Presentation Awareness:** Hints that guide consistent and appropriate UI generation
+
+These innovations combine to create a system where LLMs can serve as intuitive intermediaries between users and applications, understanding system capabilities, guiding users through complex processes, and presenting information in accessible ways.
+
+As LLMs continue to evolve and become more integrated into our digital experiences, patterns like Cognitive Hypermedia will play an increasingly important role in creating cohesive, natural, and powerful interactions. By establishing clear standards and best practices now, we can build a foundation for the next generation of AI-native applications.
+
+We invite developers, designers, and researchers to explore and extend the Cognitive Hypermedia pattern, adapting it to their unique domains and contributing to its evolution. Together, we can create a more natural and powerful bridge between human intention and machine capability, unlocking new possibilities for how we interact with technology.
+
+---
+
+## Appendix A: Glossary
+
+**Action:** An operation that can be performed on a resource, with associated parameters and effects.
+
+**Cognitive Hypermedia:** A hypermedia approach optimized for LLM consumption, with concept-oriented navigation, explicit state representation, and conversation guidance.
+
+**Collection:** A group of related resources, typically of the same type, with pagination and filtering capabilities.
+
+**Concept:** A domain entity represented as a resource type within the system.
+
+**Conversation Prompt:** A suggested response or question that helps guide the conversation flow.
+
+**HATEOAS:** Hypermedia as the Engine of Application State, a constraint of REST where clients interact with the application entirely through hypermedia provided by application servers.
+
+**HAL:** Hypertext Application Language, a format for representing hypermedia controls in JSON.
+
+**MCP:** Model Context Protocol, a standard for communication between LLMs and external tools.
+
+**Presentation Hint:** Guidance on how a resource should be visualized or interacted with.
+
+**Relationship:** A connection between resources, represented conceptually rather than as hyperlinks.
+
+**Resource:** A domain entity with properties, states, actions, and relationships.
+
+**State Machine:** A model of the possible states of a resource and the transitions between them.
+
+**State Transition:** A change from one resource state to another, triggered by an action.
+
+## Appendix B: Cognitive Hypermedia Schema
+
+This appendix provides a formal schema for the Cognitive Hypermedia format, using TypeScript interfaces for clarity:
+
+```typescript
+// Core resource structure
+interface CognitiveResource {
+  _id: string;
+  _type: string;
+  [propertyName: string]: unknown;
+  
+  _actions?: Record<string, Action>;
+  _state?: ResourceState;
+  _relationships?: Record<string, Relationship>;
+  _presentation?: PresentationHints;
+  _prompts?: ConversationPrompt[];
+}
+
+// Action definition
+interface Action {
+  description: string;
+  effect?: string;
+  confirmation?: string;
+  parameters?: Record<string, ParameterDefinition>;
+}
+
+// Parameter definition
+interface ParameterDefinition {
+  type: "string" | "number" | "boolean" | "object" | "array";
+  description?: string;
+  required?: boolean;
+  default?: unknown;
+  options?: unknown[];
+  min?: number;
+  max?: number;
+  pattern?: string;
+}
+
+// State representation
+interface ResourceState {
+  current: string;
+  description?: string;
+  allowedTransitions?: string[];
+  disallowedTransitions?: DisallowedTransition[];
+  history?: StateHistoryEntry[];
+}
+
+// Disallowed transition
+interface DisallowedTransition {
+  action: string;
+  reason: string;
+}
+
+// State history entry
+interface StateHistoryEntry {
+  state: string;
+  enteredAt: string;
+  exitedAt?: string;
+  actor?: string;
+}
+
+// Relationship definition
+interface Relationship {
+  type: string;
+  id?: string;
+  preview?: Record<string, unknown>;
+  cardinality?: "one" | "many";
+  role?: string;
+}
+
+// Presentation hints
+interface PresentationHints {
+  priority?: "high" | "medium" | "low";
+  visualization?: string;
+  icon?: string;
+  color?: string;
+  grouping?: string;
+  emphasisProperties?: string[];
+  progressIndicator?: ProgressIndicator;
+  actionPriorities?: ActionPriorities;
+}
+
+// Progress indicator
+interface ProgressIndicator {
+  type: "percentage" | "fraction" | "steps";
+  value: number;
+  max?: number;
+  label?: string;
+}
+
+// Action priorities
+interface ActionPriorities {
+  primary?: string;
+  secondary?: string[];
+}
+
+// Conversation prompt
+interface ConversationPrompt {
+  type: "follow-up" | "confirmation" | "explanation" | "suggestion";
+  text: string;
+  condition?: string;
+  priority?: "high" | "medium" | "low";
+}
+
+// Collection structure
+interface CognitiveCollection extends CognitiveResource {
+  itemType: string;
+  items: CognitiveResource[];
+  pagination?: PaginationInfo;
+  filters?: Record<string, unknown>;
+  aggregates?: Record<string, unknown>;
+}
+
+// Pagination information
+interface PaginationInfo {
+  page: number;
+  pageSize: number;
+  totalItems?: number;
+  totalPages?: number;
+}
+
+// Error representation
+interface CognitiveError {
+  _type: "error";
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+  recoveryActions?: RecoveryAction[];
+  _prompts?: ConversationPrompt[];
+}
+
+// Recovery action
+interface RecoveryAction {
+  description: string;
+  action: string;
+  parameters?: Record<string, unknown>;
+}
+```
+
+## References
+
+1. Fielding, R. T. (2000). Architectural Styles and the Design of Network-based Software Architectures. Doctoral dissertation, University of California, Irvine.
+
+2. Richardson, L., & Ruby, S. (2007). RESTful Web Services. O'Reilly Media.
+
+3. Kelly, M. (2012). HAL - Hypertext Application Language. Technical report.
+
+4. Amundsen, M. (2020). Designing and Implementing Hypermedia APIs. Manning Publications.
+
+5. Brown, A., Carneiro, G., & Penman, M. (2024). Model Context Protocol Specification. Anthropic.
+
+6. Clark, J., Heil, S., Martinez, J., & Olsson, T. (2024). Large Language Model Interaction Patterns. Technical report.
+
+7. Sutton, R. S., & Barto, A. G. (2018). Reinforcement Learning: An Introduction. MIT Press.
+
+8. Norman, D. A. (2013). The Design of Everyday Things. Basic Books.
+
+9. Knapp, J., Zeratsky, J., & Kowitz, B. (2016). Sprint: How to Solve Big Problems and Test New Ideas in Just Five Days. Simon & Schuster.
+
+10. Gamma, E., Helm, R., Johnson, R., & Vlissides, J. (1994). Design Patterns: Elements of Reusable Object-Oriented Software. Addison-Wesley.

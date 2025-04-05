@@ -1,0 +1,150 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# MCP Server Development Style Guide
+
+## 🏗️ Architecture & Structure
+
+### Directory Structure
+```
+/my-advanced-mcp-app
+|-- deno.json               # Project manifest, tasks, imports
+|-- src/
+|   |-- core/               # Core abstractions, errors, shared types
+|   |-- services/           # Business logic (independent of MCP)
+|   |-- mcp/                # MCP Protocol Layer
+|   |   |-- tools/          # Individual tool definitions
+|   |   |-- resources/      # Individual resource definitions
+|   |-- transport/          # Transport implementations
+|   |-- config/             # Configuration loading & validation
+|   |-- utils/              # Common utility functions
+|   `-- main.ts             # Application entry point
+|-- tests/                  # Unit and integration tests
+`-- README.md               # Project documentation
+```
+
+### Core Principles
+- ✨ **Modularity**: Each module has a clear, single responsibility
+- 🧩 **Composition over Inheritance**: Combine smaller functions rather than using complex class hierarchies
+- 📚 **Rich Documentation**: JSDoc for all public APIs and complex logic
+- 🧪 **Testability**: Design for easy testing in isolation
+
+## 📝 Coding Style
+
+### TypeScript
+
+- Use TypeScript's strict mode
+- Prefer explicit return types for functions
+- Use interfaces for public APIs, types for internal types
+- Leverage TypeScript's discriminated unions for complex state handling
+- Use `const` by default, `let` only when necessary, never `var`
+
+### Factory Functions & Dependency Injection
+
+Instead of classes with inheritance, use factory functions:
+
+```typescript
+// PREFERRED:
+export function createCalculatorService() {
+  async function add(a: number, b: number): Promise<number> {
+    return a + b;
+  }
+  
+  return { add };
+}
+export type CalculatorService = ReturnType<typeof createCalculatorService>;
+
+// AVOID:
+class CalculatorService {
+  public async add(a: number, b: number): Promise<number> {
+    return a + b;
+  }
+}
+```
+
+Pass dependencies explicitly:
+
+```typescript
+// Good:
+function registerMcpHandlers(
+  server: McpServer,
+  services: { calculatorService: CalculatorService }
+): void {
+  // ...
+}
+
+// Avoid:
+function registerMcpHandlers(server: McpServer): void {
+  const calculatorService = globalCalculatorService; // Bad - uses global state
+  // ...
+}
+```
+
+## 🚨 Error Handling
+
+- Define custom error classes in `src/core/errors.ts`
+- Services should throw specific, well-documented errors
+- MCP layer should catch service errors and translate to appropriate MCP responses
+- Use try/catch blocks at boundaries between layers
+
+```typescript
+import { CalculationError } from "../core/errors.ts";
+
+// In a service:
+if (isNaN(a) || isNaN(b)) {
+  throw new CalculationError("Invalid numeric input");
+}
+
+// In an MCP tool handler:
+try {
+  const result = await calculatorService.add(params.a, params.b);
+  return createMcpToolResult(`Result: ${result}`);
+} catch (error) {
+  if (error instanceof CalculationError) {
+    return createMcpErrorResult("Invalid calculation parameters");
+  }
+  throw error; // Let unexpected errors bubble up
+}
+```
+
+## 🧪 Testing
+
+- Unit test services in isolation
+- Mock dependencies in tests
+- Integration test the MCP layer using mock services
+- Use descriptive test names: `"should correctly add two valid numbers"`
+
+## 🔀 MCP Tool/Resource Structure
+
+Tools and resources should follow a consistent pattern:
+
+```typescript
+export function defineCalculateTool(calculatorService: CalculatorService) {
+  // 1. Define schema with Zod
+  const schema = z.object({
+    operation: z.enum(["add", "subtract"]),
+    a: z.number(),
+    b: z.number(),
+  });
+
+  // 2. Create handler that uses the service
+  async function handler(params: z.infer<typeof schema>) {
+    // Implementation that calls service methods
+  }
+
+  // 3. Return definition object
+  return { name: "calculate", schema, handler };
+}
+```
+
+## 📦 Imports & Exports
+
+- Use explicit imports (avoid `import * as`)
+- Group imports logically:
+  1. Standard library imports
+  2. External dependencies 
+  3. Internal modules
+- Use index.ts files to aggregate exports from a directory
+- Export types separately from implementations 

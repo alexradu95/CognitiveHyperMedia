@@ -1,0 +1,82 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+## 📚 Documentation
+
+### JSDoc + Emoji Conventions
+
+Every exported entity must have JSDoc with:
+- Brief description with leading emoji indicating purpose
+- `@param` for all parameters
+- `@returns` describing return value
+- `@throws` listing possible exceptions
+- `@example` for non-obvious usage
+
+```typescript
+/**
+ * 🔢 Performs calculations on numeric inputs.
+ * 
+ * @param a - First operand
+ * @param b - Second operand
+ * @returns ✨ The calculated result
+ * @throws {CalculationError} If inputs are invalid
+ * 
+ * @example
+ * const result = await calculate(5, 10, "add");
+ * console.log(result); // 15
+ */
+```
+
+### Inline Comments (Better Comments)
+
+Use specific prefixes for single-line comments (`//`) within implementation code to convey meaning quickly. Follow the conventions inspired by the "Better Comments" VS Code extension:
+
+-   `// *`: Highlight important information or explanations.
+-   `// !`: Indicate warnings, potential issues, or deprecated code.
+-   `// ?`: Ask questions or pose uncertainties about the code.
+-   `// TODO:` Mark tasks that need to be completed.
+-   `///`: Comment out lines of code temporarily during development or debugging.
+-   `// @param myparam`: Comment out lines of code temporarily during development or debugging.
+
+Example:
+
+```typescript
+function processData(data: any): Result {
+  // * Ensure data is normalized before processing
+  const normalized = normalize(data);
+
+  if (!isValid(normalized)) {
+    // ! This validation might be incomplete
+    throw new ValidationError("Invalid data provided");
+  }
+
+  // ? Should we add caching here for performance?
+  const result = performExpensiveCalculation(normalized);
+
+  // TODO: Add logging for the calculation result
+
+  /// let intermediate = someDebuggingStep(result);
+
+  return result;
+}
+```
+```
+
+Now, I will add this section to the `.cursor/rules/mcp-server-styleguide.mdc` file.
+
+### Emoji Usage Guide
+
+- ✨ New features, results, success
+- ⚙️ Configuration, setup
+- 🛠️ Tools, utilities
+- 🧩 Composition, modules
+- 📚 Documentation, types
+- 🔒 Security, permissions
+- ✅ Success, validation pass
+- ❌ Failure, validation fail
+- 🚨 Errors, warnings
+- 💡 Ideas, notes
+- 🔢 Numeric operations
+- 👤 User-related functions
