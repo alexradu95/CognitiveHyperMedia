@@ -8,4 +8,4 @@
 /deno.lock
 .env
 
-
+*node_modules*
