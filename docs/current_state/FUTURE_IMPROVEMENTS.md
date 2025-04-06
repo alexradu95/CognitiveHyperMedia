@@ -1,85 +1,213 @@
-# 🚀 Future Improvements
+# 🔮 Future Improvements
 
-1.  **Advanced Collection Queries:** Implement more complex filtering (operators like `gt`, `lt`, `contains`, `startsWith`), sorting (by arbitrary fields), and potentially field selection in `getCollection` and expose via protocol adapter implementations.
-2.  **Schema Validation:** Implement schema definitions for resource types (e.g., using Zod) and validate payloads in `create`/`update`/`performAction`.
-3.  **Sophisticated Enhancement:** Drive resource enhancement (links, hints, prompts) from schemas/configuration rather than hardcoded logic or simple conventions.
-4.  **Real MCP Integration:** Replace simplified MCP types/flow with actual MCP SDK integration if targeting MCP compatibility specifically.
-5.  **Authentication/Authorization:** Add a layer to control access to resources and actions.
-6.  **Real-time Updates:** Explore WebSockets or Server-Sent Events (SSE) for pushing updates to clients.
-7.  **Hypermedia Controls:** Ensure `Link` and `Action` definitions fully align with chosen hypermedia formats (like HAL, Siren, Collection+JSON).
-8.  **Deployment:** Containerization, configuration management for deployment.
-9.  ~~Create a separation layer for store agnosticism so that we can easily replace the store on demand without too much hassle.~~ ✅ IMPLEMENTED
+## Core Framework Enhancements
 
-## Storage Adapter Improvements
+### Multi-Modal Resource Extensions
 
-10. **Additional Storage Adapters:** Implement adapters for popular databases:
-    - SQL Databases (PostgreSQL, MySQL)
-    - Document Databases (MongoDB)
-    - Redis
-    - LocalStorage (for browser environments)
-    
-11. **Adapter Factory:** Create a factory pattern for adapter instantiation based on configuration.
-    ```typescript
-    // Example usage:
-    const adapter = StorageAdapterFactory.create({
-      type: "postgres",
-      connectionString: "postgresql://username:password@localhost:5432/mydb"
-    });
-    ```
+Based on the white paper's vision, extend resources to support rich media:
 
-12. **Performance Optimizations:** Add specialized methods to the adapter interface for:
-    - Batch operations (createMany, updateMany, deleteMany)
-    - Transactions
-    - Indexing and query optimization
+```typescript
+// Image integration with presentation hints
+"_media": {
+  "images": [
+    {
+      "id": "image-123",
+      "description": "Product front view",
+      "role": "primary",
+      "format": "jpeg",
+      "presentation": {
+        "preferredWidth": 600,
+        "aspectRatio": "4:3"
+      }
+    }
+  ]
+}
 
-13. **Caching Layer:** Implement a caching decorator for adapters to improve read performance:
-    ```typescript
-    const baseAdapter = new PostgresAdapter(config);
-    const adapter = new CachingAdapterDecorator(baseAdapter, cacheConfig);
-    ```
+// Audio integration
+"_media": {
+  "audio": [
+    {
+      "id": "audio-456",
+      "description": "Product demonstration",
+      "duration": 120,
+      "format": "mp3"
+    }
+  ]
+}
+```
 
-14. **Mock Adapter:** Create a fully in-memory adapter for tests that doesn't require external dependencies.
+### Adaptive Representations
 
-15. **Migration Tools:** Develop utilities to migrate data between different storage backends.
+Implement dynamic resource representations that adapt based on:
 
-## Protocol Adapter Improvements
+- **Conversation Context:** Providing different detail levels based on the conversation focus
+- **User Expertise:** Adapting terminology and explanation depth to user expertise level
+- **Device Capabilities:** Optimizing presentation for different device types
+- **Accessibility Needs:** Providing alternative representations for different accessibility requirements
 
-16. **Full OpenAI Protocol Adapter:** Implement an adapter for OpenAI's function calling API to allow AI agents to interact with resources directly.
-    ```typescript
-    const openAIAdapter = ProtocolFactory.createAdapter(store, "openai", {
-      modelName: "gpt-4-turbo"
-    });
-    const bridge = createBridge(store, openAIAdapter);
-    ```
+### Advanced State Machine Capabilities
 
-17. **Protocol Negotiation:** Implement content negotiation to dynamically choose the appropriate protocol adapter based on client capabilities:
-    ```typescript
-    app.use(async (req, res, next) => {
-      const protocol = negotiateProtocol(req.headers.accept);
-      req.protocolAdapter = ProtocolFactory.createAdapter(store, protocol);
-      next();
-    });
-    ```
+Enhance state machines with:
 
-18. **Protocol Transformer:** Create middleware that can transform between different protocols:
-    ```typescript
-    // Convert OpenAI format to MCP format or vice versa
-    const transformer = new ProtocolTransformer(sourceAdapter, targetAdapter);
-    const result = await transformer.transform(request);
-    ```
+- **Parallel States:** Resources with multiple simultaneous state dimensions
+- **Hierarchical States:** Nested state machines for complex workflows
+- **Guard Conditions:** State transitions dependent on complex conditions
+- **History States:** Returning to previous states with context preserved
+- **Event-Driven Transitions:** State changes triggered by external events
 
-19. **Multi-Protocol Support:** Allow a single instance to handle multiple protocols simultaneously:
-    ```typescript
-    const multiAdapter = new MultiProtocolAdapter({
-      mcp: mcpAdapter,
-      openai: openaiAdapter,
-      anthropic: anthropicAdapter
-    });
-    ```
+### Collaborative Cognition
 
-20. **Protocol Extensions:** Develop a plugin system for extending protocol adapters with custom functionality:
-    ```typescript
-    mcpAdapter.use(loggingPlugin);
-    mcpAdapter.use(metricPlugin);
-    mcpAdapter.use(customBusinessLogicPlugin);
-    ```
+Support collaborative interactions where multiple agents or humans interact with resources:
+
+```typescript
+"_collaboration": {
+  "activeParticipants": [
+    {
+      "id": "user-123",
+      "name": "Jane Smith",
+      "role": "editor",
+      "status": "active",
+      "lastActive": "2025-04-05T14:30:00Z"
+    },
+    {
+      "id": "agent-456",
+      "name": "Research Assistant",
+      "role": "viewer",
+      "status": "active"
+    }
+  ],
+  "actions": {
+    "invite": {
+      "description": "Invite a collaborator",
+      "parameters": {
+        "userId": { "type": "string", "required": true },
+        "role": { 
+          "type": "string", 
+          "options": ["viewer", "editor", "admin"],
+          "required": true
+        }
+      }
+    }
+  }
+}
+```
+
+## Extended MCP Tools
+
+### Search Tool
+
+Implement the `search` tool as described in the white paper:
+
+```typescript
+mcp.tool("search", {
+  query: z.string().describe("Search query"),
+  concepts: z.array(z.string()).optional().describe("Resource types to search"),
+  limit: z.number().optional().describe("Maximum results to return")
+}, async (params) => {
+  // Implementation details
+});
+```
+
+### Aggregate Tool
+
+Implement the `aggregate` tool for resource analytics:
+
+```typescript
+mcp.tool("aggregate", {
+  concept: z.string().describe("Resource type"),
+  groupBy: z.string().describe("Field to group by"),
+  metrics: z.array(z.object({
+    field: z.string(),
+    operation: z.enum(["count", "sum", "avg", "min", "max"])
+  })).describe("Metrics to calculate")
+}, async (params) => {
+  // Implementation details
+});
+```
+
+## Storage Enhancements
+
+### Additional Storage Adapters
+
+Implement additional storage adapters:
+
+- **PostgresAdapter**: SQL-based persistence with complex queries
+- **MongoAdapter**: Document database for flexible schemas
+- **RedisAdapter**: High-performance caching and simple persistence
+- **S3Adapter**: Blob storage for media and large resources
+
+### Performance Optimizations
+
+- **Partial Resource Updates**: Update only changed fields
+- **Bulk Operations**: Support for batch processing
+- **Efficient Pagination**: Cursor-based pagination for large collections
+- **Caching Layer**: In-memory caching of frequently accessed resources
+
+## Protocol & Transport Enhancements
+
+### Additional Protocol Adapters
+
+- **OpenAI Function Calling**: Support OpenAI's function call protocol
+- **Anthropic Claude Tools**: Support Anthropic's tool usage protocol
+- **Google Gemini**: Support Google's API for AI agents
+
+### Transport Layer Enhancements
+
+- **WebSockets Transport**: Real-time bidirectional communication
+- **Server-Sent Events**: Push-based updates for resource changes
+- **HTTP/2 & HTTP/3**: Optimize for modern browsers
+- **Queue-Based Processing**: Handling high-volume operations
+
+## Developer Experience
+
+### Schema Generation & Validation
+
+- **Resource Type Definition Language**: Declarative resource schemas
+- **Schema Validation**: Runtime validation of resources against schemas
+- **TypeScript Type Generation**: Generate types from schemas
+- **Schema Documentation**: Automatic documentation from schemas
+
+### Debugging Tools
+
+- **Resource Inspector**: Visual tool for examining resource structure
+- **State Machine Visualizer**: Interactive visualization of state machines
+- **Request/Response Logger**: Detailed logging of all protocol interactions
+- **Simulation Mode**: Test resource behavior without real data
+
+## Standardization
+
+### Core Resource Format
+
+Define standard formats for:
+
+- **Basic Resource Structure**: Common properties and extensions
+- **Action Patterns**: Standard patterns for common operations
+- **Presentation Vocabulary**: Standard presentation hints
+- **State Machine Definition**: Format for defining resource state machines
+
+### Interoperability
+
+- **Schema Registry**: Central registry for resource type definitions
+- **Protocol Bridges**: Translators between different AI protocols
+- **Standard Action Vocabularies**: Common actions across implementations
+- **Content Negotiation**: Support for different representation formats
+
+## Integration Examples
+
+### Task Management Application
+
+Complete the task management application from the white paper, including:
+
+- **Task Resources**: With state transitions, actions, relationships
+- **Project Resources**: Organizing tasks into projects
+- **User Resources**: Managing user profiles and assignments
+- **Dashboard Views**: Aggregated task statistics
+
+### E-commerce Product Catalog
+
+Implement the e-commerce example from the white paper:
+
+- **Product Resources**: With variants, pricing, inventory
+- **Category Resources**: Hierarchical product organization  
+- **Cart & Order Resources**: Shopping cart and order processing
+- **Review Resources**: Product reviews and ratings

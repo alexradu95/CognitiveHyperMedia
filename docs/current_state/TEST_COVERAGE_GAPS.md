@@ -1,47 +1,110 @@
-# 🧪 Test Coverage Gaps & Edge Cases
+# �� Test Coverage Gaps
 
-This list outlines potential edge cases and scenarios not explicitly covered by the current test suites (`tests/store/store_test.ts`, `tests/mcp/bridge_test.ts`).
+## Core Components
 
-## Store (`tests/store/store_test.ts`)
+### CognitiveResource
 
-*   **`create`:**
-    *   Creating with an explicit `id` that already exists for the same type.
-    *   Providing non-object data as the creation payload.
-*   **`update`:**
-    *   Explicitly asserting that attempts to update immutable properties (`id`, `createdAt`) are ignored.
-    *   Updating with incompatible data types for existing fields.
-*   **`getCollection`:**
-    *   Filtering by system properties (`id`, `createdAt`, `updatedAt`, `status`).
-    *   Filtering on non-existent properties.
-    *   Filtering on non-string values (numbers, booleans).
-    *   Filtering that yields zero results.
-    *   Pagination with `page=1` when `totalItems=0`.
-    *   Pagination with `pageSize` equal to or greater than `totalItems`.
-    *   Invalid pagination parameters (`page=0`, `pageSize=0`, negative values, non-numeric strings).
-    *   Combining filtering and pagination where the filtered set interacts differently with page boundaries.
-*   **`performAction`:**
-    *   Action requiring payload receives an empty object `{}` payload (Covered by test, but verify `performAction` logic robustness beyond `update`).
-    *   Action *not* requiring payload receives a payload.
-    *   Allowed action defined in SM has no corresponding transition defined.
-    *   `update` action via `performAction` where the payload also contains `status`.
-*   **General:**
-    *   Case sensitivity for resource types (e.g., `/Task` vs `/task`).
-    *   Concurrency (difficult to reliably automate without specific infra).
+- ✅ Basic property management
+- ✅ Action definition and retrieval
+- ✅ Relationship management
+- ✅ toJSON serialization
+- ❌ Conversation prompts with conditions and priorities
+- ❌ State representation with transition history
+- ❌ Presentation hints with various visualization types
+- ❌ Multi-modal extensions (media properties)
 
-## Bridge (`tests/mcp/bridge_test.ts`)
+### CognitiveCollection
 
-*   **`handleCreate`:**
-    *   Request with invalid JSON syntax in the body.
-    *   Request with non-JSON body but `Content-Type: application/json` header.
-    *   URI case sensitivity.
-*   **`handleExplore`:**
-    *   More URI format variations (`//type`, `/type/`, `/type//id`, `/type/id/`).
-    *   Invalid numeric values for `page`/`pageSize` query params (0, negative, non-integer, strings).
-    *   URL-encoded characters in path segments or query parameters.
-    *   Requesting a collection for a type with zero items.
-*   **`handleAct`:**
-    *   Request payload with invalid JSON syntax.
-    *   Action name or URI segments with URL-encoded characters.
-    *   Case sensitivity of action names in the URI (`/task/id/Start`).
-    *   Case sensitivity of type/id in the URI.
-    *   Explicitly testing non-4xx errors from `performAction` result in a 500 response. 
+- ✅ Basic collection management
+- ✅ Item addition and retrieval
+- ✅ Pagination information
+- ❌ Collection-level actions
+- ❌ Collection-specific presentation hints
+- ❌ Aggregates computation
+- ❌ Collection-level conversation prompts
+
+### StateMachine
+
+- ✅ Basic state transition validation
+- ✅ Allowed actions determination
+- ❌ Parallel states
+- ❌ Hierarchical state machines
+- ❌ Guard conditions
+- ❌ History states
+- ❌ Event-driven transitions
+- ❌ Transition descriptions and effects
+
+## Protocol Integration
+
+### CognitiveBridge
+
+- ✅ Basic resource exploration
+- ✅ Action execution
+- ✅ Resource creation
+- ❌ Enhanced MCP tools (search, aggregate)
+- ❌ Error format standardization
+- ❌ Multi-protocol support
+
+### MCP Protocol Adapter
+
+- ✅ Basic explore/act/create implementation
+- ❌ Resource relationship exploration
+- ❌ Collection filtering and pagination
+- ❌ Response format standardization
+- ❌ Error handling with recovery suggestions
+
+## Use Cases
+
+- ❌ Task Management example from white paper
+- ❌ E-commerce Product Catalog example
+- ❌ Multi-agent collaboration scenarios
+
+## Performance Tests
+
+- ❌ Context window optimization benchmarks
+- ❌ Serialization efficiency tests
+- ❌ Large collection pagination performance
+- ❌ State machine transition performance
+
+## Integration Tests
+
+- ✅ Basic protocol adapter tests
+- ❌ End-to-end tests with actual LLM systems
+- ❌ Multi-protocol interoperability tests
+- ❌ Transport layer tests (HTTP, WebSockets, SSE)
+
+## Specific Test Cases Needed
+
+1. **Action Parameters Validation:** Test that action parameters are properly validated against their schema definitions.
+
+2. **Conditional Conversation Prompts:** Test that prompts with conditions are correctly filtered based on resource state.
+
+3. **Resource Relationship Navigation:** Test that relationships can be traversed through the explore functionality.
+
+4. **Collection Filtering:** Test that collections can be filtered by various criteria and return correct results.
+
+5. **State Machine Transitions:** Test complex state machine scenarios, including invalid transitions.
+
+6. **Error Recovery Suggestions:** Test that errors include appropriate recovery suggestions as described in the white paper.
+
+7. **Multi-Modal Resource Handling:** Test resources with image and audio properties.
+
+8. **Collection Aggregates:** Test that collection-level statistics are computed correctly.
+
+9. **Adaptive Representation:** Test that resources adapt their representation based on context.
+
+10. **Collaborative Resource Access:** Test multi-user scenarios with role-based permissions.
+
+## New Test Strategies Needed
+
+1. **Protocol Compatibility Tests:** Validate compatibility with different LLM protocols.
+
+2. **Resource Schema Validation:** Test resources against their schema definitions.
+
+3. **User Experience Tests:** Assess conversational flow using simulated LLM interactions.
+
+4. **Performance Benchmarks:** Establish baseline performance metrics for key operations.
+
+5. **Security Tests:** Validate authorization, action permissions, and data isolation.
+
+6. **Serialization Consistency:** Ensure resources serialize consistently across different operations. 
