@@ -9,7 +9,6 @@ This list outlines potential edge cases and scenarios not explicitly covered by 
     *   Providing non-object data as the creation payload.
 *   **`update`:**
     *   Explicitly asserting that attempts to update immutable properties (`id`, `createdAt`) are ignored.
-    *   Updating the `status` property directly via `store.update()` (define & test expected behavior vs. `performAction`).
     *   Updating with incompatible data types for existing fields.
 *   **`getCollection`:**
     *   Filtering by system properties (`id`, `createdAt`, `updatedAt`, `status`).
@@ -21,7 +20,7 @@ This list outlines potential edge cases and scenarios not explicitly covered by 
     *   Invalid pagination parameters (`page=0`, `pageSize=0`, negative values, non-numeric strings).
     *   Combining filtering and pagination where the filtered set interacts differently with page boundaries.
 *   **`performAction`:**
-    *   Action requiring payload receives an empty object `{}` payload.
+    *   Action requiring payload receives an empty object `{}` payload (Covered by test, but verify `performAction` logic robustness beyond `update`).
     *   Action *not* requiring payload receives a payload.
     *   Allowed action defined in SM has no corresponding transition defined.
     *   `update` action via `performAction` where the payload also contains `status`.
