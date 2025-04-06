@@ -1,4 +1,3 @@
-import { IStorageAdapter } from "../../src/store/storage_adapter.ts";
 
 /**
  * 🔌 Deno KV implementation of the storage adapter

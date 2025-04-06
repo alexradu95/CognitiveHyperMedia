@@ -1,9 +1,11 @@
-import { CognitiveStore } from "./store/store.ts";
-import { createMcpBridge, McpBridge } from "./mcp/bridge.ts";
-import { StateMachineDefinition } from "./core/statemachine.ts";
-import { DenoKvAdapter } from "../adapters/deno/kv_adapter.ts";
 
 // --- Define or Import State Machines ---
+import { DenoKvAdapter } from "../adapters/deno/kv_adapter.ts";
+import { StateMachineDefinition } from "./core/statemachine.ts";
+import { createMcpBridge } from "./mcp/bridge.ts";
+import { CognitiveStore } from "./store/store.ts";
+
+
 // TODO: Move this to a dedicated configuration/definition file
 const taskStateMachineDefinition: StateMachineDefinition = {
   initialState: "pending",
@@ -22,7 +24,16 @@ async function main() {
   console.log("🚀 Starting Cognitive Hypermedia Server...");
 
   // --- Initialize Dependencies ---
-  const kv = await Deno.openKv(); // Use default persistent KV or specify path ":memory:"
+  let kv;
+  try {
+    // Try the current API first
+    kv = await Deno.openKv(); 
+  } catch (error: unknown) {
+    console.error("Error initializing KV:", error instanceof Error ? error.message : String(error));
+    console.log("Please make sure you're using the latest Deno version and running with --unstable-kv flag");
+    console.log("If problems persist, check the Deno KV documentation for API changes");
+    Deno.exit(1);
+  }
   const kvAdapter = new DenoKvAdapter(kv);
   const store = new CognitiveStore(kvAdapter);
   const bridge = createMcpBridge(store);

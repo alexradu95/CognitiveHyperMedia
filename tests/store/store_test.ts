@@ -1,14 +1,12 @@
-import {
-  assert,
-  assertEquals,
-  assertExists,
-  assertNotEquals,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { CognitiveStore } from "../../src/store/store.ts";
-import { CognitiveResource } from "../../src/core/resource.ts";
-import { CognitiveCollection, PaginationInfo } from "../../src/core/collection.ts";
-import { StateMachineDefinition } from "../../src/core/statemachine.ts";
+import { assert } from "https://deno.land/std@0.224.0/assert/assert.ts";
+import { assertEquals } from "https://deno.land/std@0.224.0/assert/assert_equals.ts";
+import { assertExists } from "https://deno.land/std@0.224.0/assert/assert_exists.ts";
+import { assertNotEquals } from "https://deno.land/std@0.224.0/assert/assert_not_equals.ts";
 import { DenoKvAdapter } from "../../adapters/deno/kv_adapter.ts";
+import { CognitiveCollection, PaginationInfo } from "../../src/core/collection.ts";
+import { CognitiveResource } from "../../src/core/resource.ts";
+import { StateMachineDefinition } from "../../src/core/statemachine.ts";
+import { CognitiveStore } from "../../src/store/store.ts";
 
 Deno.test("CognitiveStore - Resource Creation", async () => {
   // Use in-memory KV for testing

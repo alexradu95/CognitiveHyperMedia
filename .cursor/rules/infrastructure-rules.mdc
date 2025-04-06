@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Every edit done in the infrastracture folder of the framework, should not use or introduce any external code outside from the infrastracture folder. It should be as library agnostic as possible.

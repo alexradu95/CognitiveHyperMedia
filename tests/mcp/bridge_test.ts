@@ -1,14 +1,12 @@
 // tests/mcp/bridge_test.ts
-import {
-  assert,
-  assertEquals,
-  assertExists,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { CognitiveStore } from "../../src/store/store.ts";
-import { createMcpBridge, McpBridge } from "../../src/mcp/bridge.ts";
+
+import { assert } from "https://deno.land/std@0.224.0/assert/assert.ts";
+import { assertEquals } from "https://deno.land/std@0.224.0/assert/assert_equals.ts";
+import { assertExists } from "https://deno.land/std@0.224.0/assert/assert_exists.ts";
 import { StateMachineDefinition } from "../../src/core/statemachine.ts";
-import { CognitiveResource } from "../../src/core/resource.ts";
-import { CognitiveCollection } from "../../src/core/collection.ts";
+import { McpBridge, createMcpBridge } from "../../src/mcp/bridge.ts";
+import { CognitiveStore } from "../../src/store/store.ts";
+
 
 // --- Reuse Task State Machine Definition ---
 const taskStateMachineDefinition: StateMachineDefinition = {

@@ -1,9 +1,6 @@
-import {
-  assert,
-  assertEquals,
-  assertExists,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { CognitiveResource, Action, ParameterDefinition, ResourceState, Relationship, PresentationHints, ConversationPrompt } from "../../src/core/resource.ts"; // Corrected path
+import { assertEquals } from "https://deno.land/std@0.224.0/assert/assert_equals.ts";
+import { assertExists } from "https://deno.land/std@0.224.0/assert/assert_exists.ts";
+import { CognitiveResource, Action, ResourceState, Relationship, PresentationHints, ConversationPrompt } from "../../src/core/resource.ts";
 
 Deno.test("CognitiveResource - Creation and Basic Serialization", () => {
   const resource = new CognitiveResource({
