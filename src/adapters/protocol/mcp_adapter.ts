@@ -1,5 +1,6 @@
 import { McpError } from "../../infrastracture/core/errors.ts";
 import { IProtocolAdapter, CognitiveStore, NavigationAdapter, ProtocolError, ProtocolResponse } from "../../main.ts";
+import { z } from "zod";
 
 // Mock interfaces for testing purposes
 interface McpServer {
