@@ -1,5 +1,73 @@
 # ✅ Implemented Features
 
+## Core Functionalities
+
+*   **CognitiveStore**: Main interface to create, retrieve, update, and delete cognitive resources
+    *   **Storage Adapter Pattern**: Abstraction layer allowing different storage backends
+    *   **DenoKvAdapter**: Implementation using Deno KV storage
+    *   **Resource Enhancement**: Adding state-dependent actions, links, presentation hints
+    *   **Action Execution**: State transitions and custom actions
+    *   **Collection Retrieval**: Filtering, pagination, and counts
+*   **CognitiveResource**: Base class for all resources with metadata
+    *   **Resource Serialization**: Proper JSON serialization with comprehensive properties
+    *   **Relationship Management**: Basic support for resource relationships
+*   **CognitiveCollection**: Container and pagination for resource collections
+*   **StateMachine**: Finite state machine controlling resource lifecycle
+    *   **State Definitions**: Current state, allowed transitions
+    *   **Action Definitions**: Context-aware actions
+
+## Integration Features
+
+*   **State Machines**
+    *   Full finite state machine support
+    *   State-aware action availability
+    *   Status transitions on action execution
+*   **Resource Enhancement**
+    *   Automatic addition of state-dependent actions
+    *   Self-link generation
+    *   Presentation hints based on resource type and state
+    *   Conversation prompts for AI agents
+*   **Protocol Adapter Pattern**
+    *   Clean separation between domain logic and protocol specifics
+    *   **Refactored MCP Protocol Implementation**
+        *   Moved from infrastructure to adapters folder
+        *   Maintains proper separation of concerns
+        *   Removes external dependencies from infrastructure layer
+    *   Pluggable adapters for different protocols
+*   **Testing Coverage**
+    *   Unit tests for core classes (`CognitiveResource`, `StateMachine`)
+    *   Integration tests for `CognitiveStore` with Deno KV adapter
+    *   Protocol bridge tests verifying adapter functionality
+
+## Architectural Improvements
+
+*   **Storage Adapter Pattern**: Abstract storage operations behind an interface
+    *   Store agnosticism through `IStorageAdapter` interface
+    *   Simplified testing with potential for mock adapters
+    *   Path to implementing additional storage backends
+*   **Protocol Adapter Pattern**: Decouple domain logic from protocol specifics
+    *   Bridge implementation that routes protocol-specific requests to domain store
+    *   Clean separation of concerns between domain and protocol layers
+    *   Simplified addition of new protocol adapters
+
+## Technical Implementations
+
+*   **TypeScript Type Safety**
+    *   Generics for type-specific storage and retrieval
+    *   Interface definitions for adapters and core components
+*   **Modern JavaScript Features**
+    *   Async/await for asynchronous operations
+    *   Class-based object-oriented design
+    *   Optional chaining and nullish coalescing
+*   **Deno Runtime**
+    *   Native TypeScript support without transpilation
+    *   Modern APIs and standard library
+    *   Built-in testing framework
+*   **Clean Architecture Principles**
+    *   Dependency inversion through adapter interfaces
+    *   Separation of concerns between layers
+    *   Domain-driven design for core entities
+
 1.  **`CognitiveStore` Core:**
     *   CRUD operations (`create`, `get`, `update`, `delete`) interacting with Deno KV.
     *   Collection retrieval (`getCollection`) with basic filtering (equality) and pagination.

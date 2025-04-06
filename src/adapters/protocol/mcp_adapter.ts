@@ -1,3 +1,6 @@
+import { McpError } from "../../infrastracture/core/errors.ts";
+import { IProtocolAdapter, CognitiveStore, NavigationAdapter, ProtocolError, ProtocolResponse } from "../../main.ts";
+
 // Mock interfaces for testing purposes
 interface McpServer {
   tool(name: string, schema: any, handler: (params: any) => Promise<any>): void;
@@ -25,11 +28,7 @@ class BasicMcpServer implements McpServer {
   }
 }
 
-import { z } from "zod";
-import { CognitiveStore } from "../../infrastracture/store/store.ts";
-import { IProtocolAdapter, ProtocolResponse, ProtocolError } from "./protocol_adapter.ts";
-import { ResourceNotFoundError, McpError } from "../../infrastracture/core/errors.ts";
-import { CognitiveError } from "../../infrastracture/core/types.ts";
+
 
 /**
  * 🌉 MCP-specific implementation of the protocol adapter.
@@ -40,6 +39,7 @@ export class McpProtocolAdapter implements IProtocolAdapter {
   private mcp: McpServer;
   private transport: McpServerTransport | null = null;
   private toolsRegistered = false;
+  private navigationAdapter: NavigationAdapter;
 
   /**
    * Create a new MCP protocol adapter.
@@ -50,6 +50,7 @@ export class McpProtocolAdapter implements IProtocolAdapter {
   constructor(store: CognitiveStore, options: McpAdapterOptions = {}) {
     this.store = store;
     this.mcp = new BasicMcpServer();
+    this.navigationAdapter = new NavigationAdapter(store);
   }
 
   /**
@@ -171,19 +172,105 @@ export class McpProtocolAdapter implements IProtocolAdapter {
         return { status: 400, body: { error: "Action name is required for act." } };
       }
 
-      // Call store.performAction()
-      const resultResource = await this.store.performAction(type, id, action, payload);
+      // Handle navigation-specific actions
+      if (action === "navigate") {
+        if (!payload || !payload.relation) {
+          return { status: 400, body: { error: "Relation is required for navigate action." } };
+        }
 
-      // Format successful response
-      if (resultResource) {
+        const result = await this.navigationAdapter.traverse(type, id, payload.relation as string);
+        
+        if (!result) {
+          return { status: 404, body: { error: `No resources found with relation '${payload.relation}' from ${type}/${id}.` } };
+        }
+        
+        if (Array.isArray(result)) {
+          // Return a collection if multiple resources
+          return {
+            status: 200,
+            body: {
+              type: "collection",
+              items: result.map(r => r.toJSON()),
+              count: result.length
+            }
+          };
+        } else {
+          // Return the single resource
+          return { status: 200, body: result.toJSON() };
+        }
+      } else if (action === "link") {
+        // Handle creating links between resources
+        if (!payload || !payload.targetType || !payload.targetId || !payload.sourceRel || !payload.targetRel) {
+          return { 
+            status: 400, 
+            body: { error: "targetType, targetId, sourceRel, and targetRel are required for link action." } 
+          };
+        }
+        
+        const result = await this.navigationAdapter.link(
+          type, 
+          id, 
+          payload.targetType as string, 
+          payload.targetId as string, 
+          payload.sourceRel as string, 
+          payload.targetRel as string
+        );
+        
+        return { status: 200, body: result.toJSON() };
+      } else if (action === "unlink") {
+        // Handle removing links between resources
+        if (!payload || !payload.targetType || !payload.targetId) {
+          return { 
+            status: 400, 
+            body: { error: "targetType and targetId are required for unlink action." } 
+          };
+        }
+        
+        const result = await this.navigationAdapter.unlink(
+          type, 
+          id, 
+          payload.targetType as string, 
+          payload.targetId as string, 
+          payload.relation as string
+        );
+        
+        return { status: 200, body: result.toJSON() };
+      } else if (action === "findReferencing") {
+        // Find resources that reference this resource
+        const relation = payload?.relation as string | undefined;
+        const result = await this.navigationAdapter.findReferencing(type, id, relation);
+        
         return {
           status: 200,
-          body: resultResource.toJSON(),
+          body: {
+            type: "collection",
+            items: result.map(r => r.toJSON()),
+            count: result.length
+          }
         };
+      } else if (action === "createGraph") {
+        // Create a graph of related resources
+        const depth = payload?.depth ? Number(payload.depth) : 2;
+        const relations = payload?.relations as string[] | undefined;
+        
+        const graph = await this.navigationAdapter.createGraph(type, id, depth, relations);
+        
+        return { status: 200, body: graph };
       } else {
-        return {
-          status: 204, // No Content
-        };
+        // Call standard store.performAction() for other actions
+        const resultResource = await this.store.performAction(type, id, action, payload);
+
+        // Format successful response
+        if (resultResource) {
+          return {
+            status: 200,
+            body: resultResource.toJSON(),
+          };
+        } else {
+          return {
+            status: 204, // No Content
+          };
+        }
       }
 
     } catch (error) {
@@ -196,6 +283,8 @@ export class McpProtocolAdapter implements IProtocolAdapter {
         return { status: 403, body: { error: errorMessage } }; // Forbidden
       } else if (errorMessage.includes("Payload is required")) {
         return { status: 400, body: { error: errorMessage } }; // Bad Request
+      } else if (errorMessage.includes("not implemented")) {
+        return { status: 501, body: { error: errorMessage } }; // Not Implemented
       }
 
       return { status: 500, body: { error: errorMessage } };
@@ -246,6 +335,95 @@ export class McpProtocolAdapter implements IProtocolAdapter {
     this.registerExploreTool();
     this.registerActTool();
     this.registerCreateTool();
+    this.registerNavigateTool();
+  }
+
+  /**
+   * 🧭 Register the MCP navigate tool
+   */
+  private registerNavigateTool(): void {
+    const navigateSchema = z.object({
+      uri: z.string().min(1, "URI is required"),
+      relation: z.string().min(1, "Relation is required"),
+      depth: z.number().optional(),
+      format: z.enum(["resource", "graph"]).optional(),
+    });
+
+    this.mcp.tool("navigate", navigateSchema, async (params: { 
+      uri: string; 
+      relation: string;
+      depth?: number;
+      format?: "resource" | "graph";
+    }) => {
+      try {
+        // Parse URI to get type and ID
+        const uriParts = params.uri.split('/').filter(Boolean);
+        if (uriParts.length !== 2 || !uriParts[0] || !uriParts[1]) {
+          return this.handleMcpError(
+            new McpError("Invalid URI for navigate. Expected /type/id.", "400"),
+            "navigate"
+          );
+        }
+        
+        const [type, id] = uriParts;
+        
+        // If the user wants a graph format, use createGraph instead of traverse
+        if (params.format === "graph") {
+          const graph = await this.navigationAdapter.createGraph(
+            type, 
+            id, 
+            params.depth || 2, 
+            [params.relation]
+          );
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(graph, null, 2)
+              }
+            ]
+          };
+        } else {
+          // Default to resource traversal
+          const result = await this.navigationAdapter.traverse(type, id, params.relation);
+          
+          if (!result) {
+            return this.handleMcpError(
+              new McpError(`No resources found with relation '${params.relation}'`, "404"),
+              "navigate"
+            );
+          }
+          
+          let responseText: string;
+          
+          if (Array.isArray(result)) {
+            responseText = JSON.stringify(
+              { 
+                type: "collection", 
+                items: result.map(r => r.toJSON()),
+                count: result.length
+              }, 
+              null, 
+              2
+            );
+          } else {
+            responseText = JSON.stringify(result.toJSON(), null, 2);
+          }
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: responseText
+              }
+            ]
+          };
+        }
+      } catch (error) {
+        return this.handleMcpError(error, "navigate");
+      }
+    });
   }
 
   /**

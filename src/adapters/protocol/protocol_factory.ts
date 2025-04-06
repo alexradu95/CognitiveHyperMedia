@@ -1,6 +1,5 @@
-import { CognitiveStore } from "../../infrastracture/store/store.ts";
-import { IProtocolAdapter } from "./protocol_adapter.ts";
-import { McpProtocolAdapter, McpAdapterOptions } from "./mcp_adapter.ts";
+import { CognitiveStore, IProtocolAdapter } from "../../main.ts";
+import { McpAdapterOptions, McpProtocolAdapter } from "./mcp_adapter.ts";
 
 /**
  * 🏭 Factory for creating different protocol adapters
@@ -17,6 +16,7 @@ export class ProtocolFactory {
     return new McpProtocolAdapter(store, options);
   }
 
+  
   /**
    * Create the default protocol adapter based on configuration
    * 

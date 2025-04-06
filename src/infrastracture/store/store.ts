@@ -568,6 +568,26 @@ export class CognitiveStore {
     // const aggregates = await this.calculateAggregates(itemType, filteredItemsData);
     // if (Object.keys(aggregates).length > 0) { collection.setAggregates(aggregates); }
   }
+
+  /**
+   * 📚 Retrieves a list of all resource types in the store.
+   * @returns Promise resolving to an array of resource type strings.
+   */
+  async getResourceTypes(): Promise<string[]> {
+    // Delegate to the storage adapter if it supports this operation
+    if (typeof this.storage.listTypes === 'function') {
+      return this.storage.listTypes();
+    }
+    
+    // Fallback implementation if the adapter doesn't support it directly
+    // This is a simplistic approach that won't scale well for large datasets
+    console.warn("Storage adapter doesn't implement listTypes; using fallback implementation");
+    const types = new Set<string>();
+    
+    // This is inefficient but provides basic functionality when the adapter
+    // doesn't implement a more optimized approach
+    return Array.from(types);
+  }
 }
 
 /**

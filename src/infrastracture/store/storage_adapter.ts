@@ -57,4 +57,11 @@ export interface IStorageAdapter {
     items: Array<Record<string, unknown>>;
     totalItems: number;
   }>;
+  
+  /**
+   * 📚 List all resource types available in the storage
+   * 
+   * @returns Promise resolving to an array of resource type strings
+   */
+  listTypes?(): Promise<string[]>;
 } 

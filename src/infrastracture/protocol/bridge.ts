@@ -1,4 +1,4 @@
-import { CognitiveStore } from "../../infrastracture/store/store.ts";
+import { CognitiveStore } from "../store/store.ts";
 import { IProtocolAdapter } from "./protocol_adapter.ts";
 
 /**
