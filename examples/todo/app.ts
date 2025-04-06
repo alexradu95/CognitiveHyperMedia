@@ -10,8 +10,8 @@ import {
 import { ProtocolFactory } from "../../src/adapters/protocol/protocol_factory.ts";
 
 // Add MCP SDK imports
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer, ResourceTemplate } from "npm:@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
 // Todo App specific state machine definition
