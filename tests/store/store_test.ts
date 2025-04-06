@@ -9,70 +9,6 @@ import { CognitiveResource } from "../../src/core/resource.ts";
 import { CognitiveCollection, PaginationInfo } from "../../src/core/collection.ts";
 import { StateMachineDefinition } from "../../src/core/statemachine.ts"; // Import SM definition type
 
-// --- Test Setup: Define a sample state machine for a 'task' ---
-const taskStateMachineDefinition: StateMachineDefinition = {
-  initialState: "pending",
-  states: {
-    pending: {
-      name: "pending",
-      description: "Task is waiting to be started.",
-      allowedActions: {
-        start: { description: "Start working on the task." },
-        cancel: { description: "Cancel the task." },
-      },
-      transitions: {
-        start: { target: "inProgress" },
-        cancel: { target: "cancelled" },
-      },
-    },
-    inProgress: {
-      name: "inProgress",
-      description: "Task is actively being worked on.",
-      allowedActions: {
-        complete: { description: "Mark the task as complete." },
-        block: { description: "Mark the task as blocked." },
-      },
-      transitions: {
-        complete: { target: "completed" },
-        block: { target: "blocked" },
-      },
-    },
-    blocked: {
-      name: "blocked",
-      description: "Task is blocked and cannot proceed.",
-      allowedActions: {
-        unblock: { description: "Remove the block." },
-        cancel: { description: "Cancel the blocked task." },
-      },
-      transitions: {
-        unblock: { target: "inProgress" },
-        cancel: { target: "cancelled" },
-      },
-    },
-    completed: {
-      name: "completed",
-      description: "Task has been successfully completed.",
-      allowedActions: {
-        archive: { description: "Archive the completed task." },
-      },
-      transitions: {
-        archive: { target: "archived" },
-      },
-    },
-    cancelled: {
-      name: "cancelled",
-      description: "Task has been cancelled.",
-      allowedActions: {}, // No actions
-    },
-    archived: {
-      name: "archived",
-      description: "Task has been archived.",
-      allowedActions: {}, // No actions
-    },
-  },
-};
-// --- End Test Setup ---
-
 Deno.test("CognitiveStore - Resource Creation", async () => {
   // Use in-memory KV for testing
   const kv = await Deno.openKv(":memory:");
@@ -116,6 +52,16 @@ Deno.test("CognitiveStore - Resource Creation", async () => {
 
   // Test creation with State Machine integration
   const TASK_TYPE = "task";
+  // Define SM locally for this test
+  const taskStateMachineDefinition: StateMachineDefinition = {
+    initialState: "pending",
+    states: {
+      pending: { name: "pending", description: "Task is waiting.", allowedActions: { start: {description: "Start"}, cancel: {description: "Cancel"}, update: {description: "Update"}, delete: {description: "Delete"} }, transitions: { start: { target: "inProgress" }, cancel: { target: "cancelled" } } },
+      // Only include states needed for this specific test (pending)
+      inProgress: { name: "inProgress", description: "Task is active.", allowedActions: {}, transitions: {} }, // Target for transition
+      cancelled: { name: "cancelled", description: "Task cancelled.", allowedActions: {}, transitions: {} } // Target for transition
+    },
+  };
   store.registerStateMachine(TASK_TYPE, taskStateMachineDefinition);
   const taskResource = await store.create(TASK_TYPE, { title: "My First Task" });
   assertExists(taskResource);
@@ -169,6 +115,19 @@ Deno.test("CognitiveStore - Resource Retrieval (get)", async () => {
 
   // 7. Test retrieval with State Machine integration
   const TASK_TYPE = "task";
+  // Define SM locally for this test (ensure it includes states tested)
+  const taskStateMachineDefinition: StateMachineDefinition = {
+    initialState: "pending",
+    states: {
+      pending: { name: "pending", description: "Task is waiting to be started.", allowedActions: { start: {description: "Start"}, cancel: {description: "Cancel"}, update: {description: "Update"}, delete: {description: "Delete"} }, transitions: { start: { target: "inProgress" } } },
+      inProgress: { name: "inProgress", description: "Task is actively being worked on.", allowedActions: { complete: {description: "Complete"}, block: {description: "Block"}, update: {description: "Update"}, delete: {description: "Delete"} }, transitions: { complete: { target: "completed" } } },
+      // Include target states needed for transitions tested
+      completed: { name: "completed", description: "Task is done.", allowedActions: {}, transitions: {} },
+      blocked: { name: "blocked", description: "Task is blocked.", allowedActions: {}, transitions: {} },
+      cancelled: { name: "cancelled", description: "Task cancelled.", allowedActions: {}, transitions: {} },
+      archived: { name: "archived", description: "Task archived.", allowedActions: {}, transitions: {} }
+    },
+  };
   store.registerStateMachine(TASK_TYPE, taskStateMachineDefinition); // Ensure it's registered
   const task = await store.create(TASK_TYPE, { name: "Task to Retrieve" });
   const taskId = task.getId();
@@ -307,7 +266,15 @@ Deno.test("CognitiveStore - Resource Update (update)", async () => {
   assertEquals(errorThrown, true, "Updating non-existent resource should throw");
 
   // 4. Test error: Attempting direct status update via update()
-  const TASK_TYPE_UPDATE = "taskForUpdateTest"; // Use a distinct type to avoid interference
+  const TASK_TYPE_UPDATE = "taskForUpdateTest";
+  // Define SM locally for this test
+  const taskStateMachineDefinition: StateMachineDefinition = {
+    initialState: "pending",
+    states: {
+      // Only need pending state for this test, as we just check registration
+      pending: { name: "pending", description: "Task is waiting.", allowedActions: { update: {description: "Update"} }, transitions: { } }
+    },
+  };
   store.registerStateMachine(TASK_TYPE_UPDATE, taskStateMachineDefinition);
   const taskForStatusTest = await store.create(TASK_TYPE_UPDATE, { name: "Status Test" });
   const taskStatusTestId = taskForStatusTest.getId();
@@ -537,12 +504,24 @@ Deno.test("CognitiveStore - Action Execution (performAction)", async () => {
     await store.performAction(TYPE, resource1Id, "update"); // No payload
   } catch (error) {
     errorThrown = true;
-    assert((error as Error).message.includes("Payload is required for 'update' action"));
+    assert((error as Error).message.includes("Payload is required and cannot be empty for 'update' action."));
   }
   assertEquals(errorThrown, true, "Should throw when update payload is missing");
 
   // --- State Machine Action Tests ---
   const TASK_TYPE = "task";
+  // Define the FULL SM locally for this comprehensive test suite
+  const taskStateMachineDefinition: StateMachineDefinition = {
+    initialState: "pending",
+    states: {
+      pending: { name: "pending", description: "Task is waiting.", allowedActions: { start: {description: "Start"}, cancel: {description: "Cancel"}, update: {description: "Update Task Details"}, delete: {description: "Delete Task", confirmation: "Are you sure?"} }, transitions: { start: { target: "inProgress" }, cancel: { target: "cancelled" } } },
+      inProgress: { name: "inProgress", description: "Task is active.", allowedActions: { complete: {description: "Complete"}, block: {description: "Block"}, update: {description: "Update Task Details"}, delete: {description: "Delete Task", confirmation: "Are you sure?"} }, transitions: { complete: { target: "completed" }, block: { target: "blocked" } } },
+      blocked: { name: "blocked", description: "Task is blocked.", allowedActions: { unblock: {description: "Unblock"}, cancel: {description: "Cancel"}, update: {description: "Update Task Details"}, delete: {description: "Delete Task", confirmation: "Are you sure?"} }, transitions: { unblock: { target: "inProgress" }, cancel: { target: "cancelled" } } },
+      completed: { name: "completed", description: "Task is done.", allowedActions: { archive: {description: "Archive"} }, transitions: { archive: { target: "archived" } } }, // No update/delete here
+      cancelled: { name: "cancelled", description: "Task cancelled.", allowedActions: {} }, // No actions
+      archived: { name: "archived", description: "Task archived.", allowedActions: {} } // No actions
+    },
+  };
   store.registerStateMachine(TASK_TYPE, taskStateMachineDefinition);
 
   // 6. Test successful state transition

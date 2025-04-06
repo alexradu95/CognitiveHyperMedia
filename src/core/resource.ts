@@ -234,6 +234,11 @@ export class CognitiveResource {
 
     return result;
   }
+
+  /** 🗑️ Removes all actions associated with this resource. */
+  clearActions(): void {
+    this._actions = {};
+  }
 }
 
 // --- Future Type Definitions (Placeholder) ---

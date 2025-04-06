@@ -41,4 +41,6 @@
 9.  **Testing:**
     *   Unit tests for `CognitiveStore` covering CRUD, collections, state integration, enhancements.
     *   Unit tests for `StateMachine`.
-    *   Unit tests for `McpBridge` handlers covering success and error cases. 
+    *   Unit tests for `McpBridge` handlers covering success and error cases.
+10. **Strict State Action Checking:**
+    *   `performAction` now strictly enforces that an action (including `update`/`delete`) must be present in the current state's `allowedActions` if a state machine is registered. 

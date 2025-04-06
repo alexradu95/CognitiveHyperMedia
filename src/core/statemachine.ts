@@ -77,7 +77,8 @@ export class StateMachine {
    */
   isActionAllowed(stateName: string, actionName: string): boolean {
     const stateDef = this.getStateDefinition(stateName);
-    return !!stateDef?.allowedActions[actionName];
+    const isAllowed = !!stateDef?.allowedActions[actionName];
+    return isAllowed;
   }
 
   /**

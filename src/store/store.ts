@@ -316,11 +316,10 @@ export class CognitiveStore {
     const currentState = resource.getProperty("status") as string | undefined;
 
     if (sm && currentState) {
+      const allowed = sm.isActionAllowed(currentState, actionName);
       // State machine exists, check if action is allowed in the current state
-      if (!sm.isActionAllowed(currentState, actionName)) {
-        // Also check default actions if not explicitly allowed by state?
-        // For now, let's be strict: if a state machine exists, the action MUST be in the state's allowedActions.
-        // We might refine this later to allow default update/delete unless explicitly forbidden.
+      if (!allowed) {
+        // Strict check: Action must be defined in the current state's allowedActions.
         throw new Error(`Action '${actionName}' is not allowed in the current state '${currentState}' for resource ${type}/${id}.`);
       }
     } else {
@@ -338,8 +337,7 @@ export class CognitiveStore {
     // Execute the action logic
     switch (actionName) {
       case "update":
-        console.log(`[DEBUG performAction update] actionName: ${actionName}, payload: ${JSON.stringify(payload)}`);
-        console.log(`[DEBUG performAction update] !payload === ${!payload}`); // Log boolean result
+        // Restore original check
         if (!payload || Object.keys(payload).length === 0) {
           throw new Error(`Payload is required and cannot be empty for 'update' action.`);
         }
@@ -421,6 +419,10 @@ export class CognitiveStore {
    */
   private enhanceResource(resource: CognitiveResource): void {
     const type = resource.getType();
+
+    // Clear existing actions before re-evaluating based on current state/defaults
+    resource.clearActions();
+
     const sm = this.stateMachines.get(type);
     const currentState = resource.getProperty("status") as string | undefined;
 
