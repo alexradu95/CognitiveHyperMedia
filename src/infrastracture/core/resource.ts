@@ -1,18 +1,26 @@
+import { 
+  ResourceTypeLiteral, 
+  PriorityLevel, 
+  ParameterType, 
+  PromptType,
+  Cardinality,
+  ProgressIndicatorType
+} from "./types.ts";
+
 /**
  * 🧩 Represents a core resource within the Cognitive Hypermedia framework.
  * Based on Section 6.2 of the white paper.
  */
 export class CognitiveResource {
-  private _id: string;
-  private _type: string;
-  private _properties: Record<string, unknown>;
-  // Placeholders for future features based on white paper sections 4 & 6.2
-  private _actions: Record<string, Action>;
-  private _state?: ResourceState;
-  private _relationships: Record<string, Relationship>;
-  private _presentation: PresentationHints;
-  private _prompts: ConversationPrompt[];
-  private _linksArray: Link[] = [];
+  #id: string;
+  #type: string;
+  #properties: Record<string, unknown>;
+  #actions: Record<string, Action>;
+  #state?: ResourceState;
+  #relationships: Record<string, Relationship>;
+  #presentation: PresentationHints;
+  #prompts: ConversationPrompt[];
+  #links: Link[] = [];
 
   /**
    * ⚙️ Creates a new CognitiveResource instance.
@@ -28,15 +36,15 @@ export class CognitiveResource {
     actions?: Record<string, Action>;
     links?: Link[];
   }) {
-    this._id = config.id;
-    this._type = config.type;
-    this._properties = config.properties || {};
-    this._actions = config.actions || {};
-    this._relationships = {}; // Initialize relationships
-    this._presentation = {}; // Initialize presentation hints
-    this._prompts = []; // Initialize prompts
-    this._linksArray = config.links || [];
-    this.addLink({ rel: "self", href: `/${this._type}/${this._id}` });
+    this.#id = config.id;
+    this.#type = config.type;
+    this.#properties = config.properties ?? {};
+    this.#actions = config.actions ?? {};
+    this.#relationships = {}; 
+    this.#presentation = {}; 
+    this.#prompts = []; 
+    this.#links = config.links ? [...config.links] : [];
+    this.addLink({ rel: "self", href: `/${this.#type}/${this.#id}` });
   }
 
   /**
@@ -44,7 +52,7 @@ export class CognitiveResource {
    * @returns The resource ID.
    */
   getId(): string {
-    return this._id;
+    return this.#id;
   }
 
   /**
@@ -52,7 +60,7 @@ export class CognitiveResource {
    * @returns The resource type.
    */
   getType(): string {
-    return this._type;
+    return this.#type;
   }
 
   /**
@@ -61,7 +69,7 @@ export class CognitiveResource {
    * @returns The value of the property, or undefined if it doesn't exist.
    */
   getProperty(name: string): unknown {
-    return this._properties[name];
+    return this.#properties[name];
   }
 
   /**
@@ -69,7 +77,7 @@ export class CognitiveResource {
    * @returns A Map containing all resource properties.
    */
   getProperties(): Map<string, unknown> {
-    return new Map(Object.entries(this._properties)); // Convert object to [key, value] pairs for Map constructor
+    return new Map(Object.entries(this.#properties));
   }
 
   /**
@@ -79,7 +87,7 @@ export class CognitiveResource {
    * @returns The current CognitiveResource instance for chaining.
    */
   setProperty(name: string, value: unknown): CognitiveResource {
-    this._properties[name] = value;
+    this.#properties[name] = value;
     return this;
   }
 
@@ -90,7 +98,7 @@ export class CognitiveResource {
    * @returns The current CognitiveResource instance for chaining.
    */
   addAction(id: string, action: Action): CognitiveResource {
-    this._actions[id] = action;
+    this.#actions[id] = action;
     return this;
   }
 
@@ -100,7 +108,15 @@ export class CognitiveResource {
    * @returns The action definition, or undefined if it doesn't exist.
    */
   getAction(id: string): Action | undefined {
-    return this._actions[id];
+    return this.#actions[id];
+  }
+
+  /**
+   * ✨ Gets all actions associated with this resource
+   * @returns Record of action definitions
+   */
+  getActions(): Record<string, Action> {
+    return { ...this.#actions };
   }
 
   /**
@@ -109,7 +125,7 @@ export class CognitiveResource {
    * @returns The current CognitiveResource instance for chaining.
    */
   setState(state: ResourceState): CognitiveResource {
-    this._state = state;
+    this.#state = state;
     return this;
   }
 
@@ -118,7 +134,15 @@ export class CognitiveResource {
    * @returns The current state string, or undefined if no state is set.
    */
   getCurrentState(): string | undefined {
-    return this._state?.current;
+    return this.#state?.current;
+  }
+
+  /**
+   * ✨ Gets the full state representation of the resource
+   * @returns The state object, or undefined if not set
+   */
+  getState(): ResourceState | undefined {
+    return this.#state ? { ...this.#state } : undefined;
   }
 
   /**
@@ -128,7 +152,7 @@ export class CognitiveResource {
    * @returns The current CognitiveResource instance for chaining.
    */
   addRelationship(name: string, relationship: Relationship): CognitiveResource {
-    this._relationships[name] = relationship;
+    this.#relationships[name] = relationship;
     return this;
   }
 
@@ -138,7 +162,15 @@ export class CognitiveResource {
    * @returns The relationship definition, or undefined if it doesn't exist.
    */
   getRelationship(name: string): Relationship | undefined {
-    return this._relationships[name];
+    return this.#relationships[name];
+  }
+
+  /**
+   * ✨ Gets all relationships associated with this resource
+   * @returns Record of relationship definitions
+   */
+  getRelationships(): Record<string, Relationship> {
+    return { ...this.#relationships };
   }
 
   /**
@@ -148,8 +180,16 @@ export class CognitiveResource {
    * @returns The current CognitiveResource instance for chaining.
    */
   setPresentation(hints: Partial<PresentationHints>): CognitiveResource {
-    this._presentation = { ...this._presentation, ...hints };
+    this.#presentation = { ...this.#presentation, ...hints };
     return this;
+  }
+
+  /**
+   * ✨ Gets the presentation hints for this resource
+   * @returns The presentation hints object
+   */
+  getPresentation(): PresentationHints {
+    return { ...this.#presentation };
   }
 
   /**
@@ -158,7 +198,7 @@ export class CognitiveResource {
    * @returns The current CognitiveResource instance for chaining.
    */
   addPrompt(prompt: ConversationPrompt): CognitiveResource {
-    this._prompts.push(prompt);
+    this.#prompts.push(prompt);
     return this;
   }
 
@@ -167,21 +207,22 @@ export class CognitiveResource {
    * @returns An array of conversation prompt objects.
    */
   getPrompts(): ConversationPrompt[] {
-    // Return a copy to prevent external modification of the internal array
-    return [...this._prompts];
+    return [...this.#prompts];
   }
 
   /**
    * 🔗 Adds a link related to this resource.
    * Avoids adding duplicate links based on 'rel' and 'href'.
    * @param link - The Link object to add.
+   * @returns The current CognitiveResource instance for chaining.
    */
-  addLink(link: Link): void {
+  addLink(link: Link): CognitiveResource {
     // Avoid duplicates based on rel/href combo
-    const exists = this._linksArray.some(l => l.rel === link.rel && l.href === link.href);
+    const exists = this.#links.some(l => l.rel === link.rel && l.href === link.href);
     if (!exists) {
-      this._linksArray.push(link);
+      this.#links.push(link);
     }
+    return this;
   }
 
   /**
@@ -189,7 +230,7 @@ export class CognitiveResource {
    * @returns An array of Link objects.
    */
   getLinks(): Link[] {
-    return [...this._linksArray]; // Return a copy
+    return [...this.#links];
   }
 
   /**
@@ -199,57 +240,193 @@ export class CognitiveResource {
    * @returns The Link object, or undefined if not found.
    */
   getLink(rel: string): Link | undefined {
-    return this._linksArray.find(link => link.rel === rel);
+    return this.#links.find(link => link.rel === rel);
   }
 
   /**
    * ✨ Serializes the resource to a plain JSON object according to the
    * Cognitive Hypermedia format (Section 4.1).
-   * Currently only includes basic properties (_id, _type, standard props).
-   * Extensions (_actions, _state, etc.) will be added in subsequent TDD cycles.
    * @returns A JSON representation of the resource.
    */
   toJSON(): Record<string, any> {
     const result: Record<string, any> = {
-      id: this._id,
-      type: this._type,
-      properties: this._properties,
+      id: this.#id,
+      type: this.#type,
+      properties: this.#properties,
     };
 
-    if (Object.keys(this._actions).length > 0) {
-      result.actions = this._actions;
+    // Only include non-empty collections
+    if (Object.keys(this.#actions).length > 0) {
+      result.actions = this.#actions;
     }
-    if (this._state) {
-      result._state = this._state;
+    
+    if (this.#state) {
+      result._state = this.#state;
     }
-    if (Object.keys(this._relationships).length > 0) {
-      result._relationships = this._relationships;
+    
+    if (Object.keys(this.#relationships).length > 0) {
+      result._relationships = this.#relationships;
     }
-    if (Object.keys(this._presentation).length > 0) {
-      result.presentation = this._presentation;
+    
+    if (Object.keys(this.#presentation).length > 0) {
+      result.presentation = this.#presentation;
     }
-    if (this._prompts.length > 0) {
-      result.prompts = this._prompts;
+    
+    if (this.#prompts.length > 0) {
+      result.prompts = this.#prompts;
     }
-    if (this._linksArray.length > 0) {
+    
+    if (this.#links.length > 0) {
       result.links = this.getLinks();
     }
 
     return result;
   }
 
-  /** 🗑️ Removes all actions associated with this resource. */
-  clearActions(): void {
-    this._actions = {};
+  /** 
+   * 🗑️ Removes all actions associated with this resource. 
+   * @returns The current CognitiveResource instance for chaining.
+   */
+  clearActions(): CognitiveResource {
+    this.#actions = {};
+    return this;
   }
 }
 
-// --- Future Type Definitions (Placeholder) ---
-// Based on Appendix B / Section 4 schemas
+/**
+ * 🏗️ Builder for creating CognitiveResource instances
+ */
+export class ResourceBuilder {
+  #id: string;
+  #type: string;
+  #properties: Record<string, unknown> = {};
+  #actions: Record<string, Action> = {};
+  #links: Link[] = [];
+  #state?: ResourceState;
+  #relationships: Record<string, Relationship> = {};
+  #presentation: PresentationHints = {};
+  #prompts: ConversationPrompt[] = [];
+
+  /**
+   * Create a new ResourceBuilder
+   * @param id - Resource identifier
+   * @param type - Resource type
+   */
+  constructor(id: string, type: string) {
+    this.#id = id;
+    this.#type = type;
+  }
+
+  /**
+   * Add a property to the resource
+   */
+  property(name: string, value: unknown): ResourceBuilder {
+    this.#properties[name] = value;
+    return this;
+  }
+
+  /**
+   * Add multiple properties to the resource
+   */
+  properties(props: Record<string, unknown>): ResourceBuilder {
+    this.#properties = { ...this.#properties, ...props };
+    return this;
+  }
+
+  /**
+   * Add an action to the resource
+   */
+  action(id: string, action: Action): ResourceBuilder {
+    this.#actions[id] = action;
+    return this;
+  }
+
+  /**
+   * Set the state of the resource
+   */
+  state(state: ResourceState): ResourceBuilder {
+    this.#state = state;
+    return this;
+  }
+
+  /**
+   * Add a relationship to the resource
+   */
+  relationship(name: string, relationship: Relationship): ResourceBuilder {
+    this.#relationships[name] = relationship;
+    return this;
+  }
+
+  /**
+   * Set presentation hints for the resource
+   */
+  presentation(hints: Partial<PresentationHints>): ResourceBuilder {
+    this.#presentation = { ...this.#presentation, ...hints };
+    return this;
+  }
+
+  /**
+   * Add a conversation prompt to the resource
+   */
+  prompt(prompt: ConversationPrompt): ResourceBuilder {
+    this.#prompts.push(prompt);
+    return this;
+  }
+
+  /**
+   * Add a link to the resource
+   */
+  link(link: Link): ResourceBuilder {
+    this.#links.push(link);
+    return this;
+  }
+
+  /**
+   * Build the CognitiveResource instance
+   */
+  build(): CognitiveResource {
+    const resource = new CognitiveResource({
+      id: this.#id,
+      type: this.#type,
+      properties: this.#properties,
+      actions: this.#actions,
+      links: this.#links
+    });
+
+    if (this.#state) {
+      resource.setState(this.#state);
+    }
+
+    // Add relationships
+    Object.entries(this.#relationships).forEach(([name, rel]) => {
+      resource.addRelationship(name, rel);
+    });
+
+    // Set presentation
+    if (Object.keys(this.#presentation).length > 0) {
+      resource.setPresentation(this.#presentation);
+    }
+
+    // Add prompts
+    this.#prompts.forEach(prompt => {
+      resource.addPrompt(prompt);
+    });
+
+    return resource;
+  }
+
+  /**
+   * Create a ResourceBuilder for the given id and type
+   */
+  static for(id: string, type: string): ResourceBuilder {
+    return new ResourceBuilder(id, type);
+  }
+}
+
+// --- Type Definitions ---
 
 /**
- * 🧩 Defines an action that can be performed on a resource.
- * Based on Section 4.2 of the white paper.
+ * 🛠️ Definition of an action available on a resource.
  */
 export interface Action {
   description: string;
@@ -259,11 +436,10 @@ export interface Action {
 }
 
 /**
- * 🧩 Defines a parameter for an action.
- * Based on Section 4.2 of the white paper.
+ * 🛠️ Definition of a parameter for an action.
  */
 export interface ParameterDefinition {
-  type: "string" | "number" | "boolean" | "object" | "array";
+  type: ParameterType;
   description?: string;
   required?: boolean;
   default?: unknown;
@@ -274,8 +450,7 @@ export interface ParameterDefinition {
 }
 
 /**
- * 🧩 Represents the state of a resource.
- * Based on Section 4.3 of the white paper.
+ * 📚 Representation of the state of a resource.
  */
 export interface ResourceState {
   current: string; // Current state identifier
@@ -286,8 +461,7 @@ export interface ResourceState {
 }
 
 /**
- * 🧩 Describes why a specific transition (action) is disallowed.
- * Part of the ResourceState.
+ * 📚 Information about a disallowed state transition.
  */
 export interface DisallowedTransition {
   action: string;
@@ -295,8 +469,7 @@ export interface DisallowedTransition {
 }
 
 /**
- * 🧩 Represents an entry in the state history of a resource.
- * Part of the ResourceState.
+ * 📚 Entry in the state history of a resource.
  */
 export interface StateHistoryEntry {
   state: string;
@@ -306,23 +479,21 @@ export interface StateHistoryEntry {
 }
 
 /**
- * 🧩 Defines a relationship between resources using a concept-oriented approach.
- * Based on Section 4.4 of the white paper.
+ * 🧩 Definition of a relationship between resources.
  */
 export interface Relationship {
   type: string; // Related resource type (e.g., "user", "task")
   id?: string; // Related resource ID (optional for cardinality many w/ only preview)
   preview?: Record<string, unknown>; // Preview data of the related resource
-  cardinality?: "one" | "many"; // Relationship cardinality (defaults to 'one' if omitted)
+  cardinality?: Cardinality; // Relationship cardinality (defaults to 'one' if omitted)
   role?: string; // Describes the role of the related resource (e.g., "assignee", "parent")
 }
 
 /**
- * 🧩 Provides guidance on how the resource should be visualized and interacted with.
- * Based on Section 4.5 of the white paper.
+ * 🎨 Guidance on how a resource should be visualized.
  */
 export interface PresentationHints {
-  priority?: "high" | "medium" | "low"; // Importance for UI rendering
+  priority?: PriorityLevel; // Importance for UI rendering
   visualization?: string; // Suggested visualization type (e.g., "card", "listItem")
   icon?: string; // Suggested icon name/identifier
   color?: string; // Suggested color (e.g., CSS color name or hex code)
@@ -333,19 +504,17 @@ export interface PresentationHints {
 }
 
 /**
- * 🧩 Defines how to visualize progress related to a resource.
- * Part of PresentationHints.
+ * 📊 Guidance for visualizing progress.
  */
 export interface ProgressIndicator {
-  type: "percentage" | "fraction" | "steps";
+  type: ProgressIndicatorType;
   value: number;
   max?: number; // Required for fraction/steps type
   label?: string;
 }
 
 /**
- * 🧩 Defines priority levels for actions within a UI.
- * Part of PresentationHints.
+ * 🎨 Guidance on emphasizing specific actions.
  */
 export interface ActionPriorities {
   primary?: string; // Identifier of the primary action
@@ -353,18 +522,17 @@ export interface ActionPriorities {
 }
 
 /**
- * 🧩 Provides suggested conversation flows to help the LLM guide interaction.
- * Based on Section 4.6 of the white paper.
+ * 🗣️ Suggested prompt to guide conversation flow.
  */
 export interface ConversationPrompt {
-  type: "follow-up" | "confirmation" | "explanation" | "suggestion";
+  type: PromptType;
   text: string;
   condition?: string; // Optional condition expression (e.g., "when state.current == 'pending'")
-  priority?: "high" | "medium" | "low";
+  priority?: PriorityLevel;
 }
 
 /**
- * 🔗 Represents a hyperlink related to a resource (HATEOAS).
+ * 🔗 Link to a related resource
  */
 export interface Link {
   /** Relation type (e.g., "self", "related", "collection", "schema", inferred type like "customer"). */
@@ -378,14 +546,12 @@ export interface Link {
 }
 
 /**
- * 🧩 Defines an action that can be performed on a resource.
- * Based on Section 4.2 of the white paper.
+ * ⚙️ Configuration options for creating a resource
  */
 export interface CognitiveResourceOptions {
   id: string;
-  type: string;
+  type: ResourceTypeLiteral;
   properties?: Record<string, unknown>;
   actions?: Record<string, Action>;
-  links?: Link[]; // Add links to options
-  // ... other potential options ...
+  links?: Link[];
 } 

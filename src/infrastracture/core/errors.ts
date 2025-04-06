@@ -85,7 +85,7 @@ export class InvalidActionError extends AppError {
    * Creates a new invalid action error.
    */
   constructor(resourceType: string, resourceId: string, action: string) {
-    super(`Action ${action} not available for ${resourceType}/${resourceId}`);
+    super(`Action '${action}' not found on resource ${resourceType}/${resourceId}`);
     this.resourceType = resourceType;
     this.resourceId = resourceId;
     this.action = action;

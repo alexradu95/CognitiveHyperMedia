@@ -1,4 +1,5 @@
-import { CognitiveResource } from "./resource.ts";
+import { CognitiveResource, ResourceBuilder } from "./resource.ts";
+import { isCollection, isError } from "./types.ts";
 
 /**
  * 📚 Represents a collection of Cognitive Resources.
@@ -6,12 +7,11 @@ import { CognitiveResource } from "./resource.ts";
  * Based on Section 4.7 and 6.2 of the white paper.
  */
 export class CognitiveCollection extends CognitiveResource {
-  private _itemType: string;
-  private _items: CognitiveResource[];
-  // Placeholders for future features
-  private _pagination?: PaginationInfo;
-  private _filters?: Record<string, unknown>;
-  private _aggregates?: Record<string, unknown>;
+  #itemType: string;
+  #items: CognitiveResource[];
+  #pagination?: PaginationInfo;
+  #filters?: Record<string, unknown>;
+  #aggregates?: Record<string, unknown>;
 
   /**
    * ⚙️ Creates a new CognitiveCollection instance.
@@ -32,9 +32,20 @@ export class CognitiveCollection extends CognitiveResource {
       properties: { itemType: config.itemType }, // Store itemType as a property
     });
 
-    this._itemType = config.itemType;
-    this._items = config.items || [];
-    // Initialize other properties as needed
+    this.#itemType = config.itemType;
+    this.#items = config.items ?? [];
+    
+    // Add self link and collection link
+    this.addLink({ rel: "self", href: `/${this.getType()}/${this.getId()}` });
+    this.addLink({ rel: "items", href: `/${this.#itemType}` });
+  }
+
+  /**
+   * ✨ Gets the type of items in this collection
+   * @returns The item type string
+   */
+  getItemType(): string {
+    return this.#itemType;
   }
 
   /**
@@ -43,8 +54,16 @@ export class CognitiveCollection extends CognitiveResource {
    * @returns The current CognitiveCollection instance for chaining.
    */
   setPagination(info: PaginationInfo): CognitiveCollection {
-    this._pagination = info;
+    this.#pagination = info;
     return this;
+  }
+
+  /**
+   * ✨ Gets the pagination information for the collection.
+   * @returns The pagination information object, or undefined if not set.
+   */
+  getPagination(): PaginationInfo | undefined {
+    return this.#pagination ? { ...this.#pagination } : undefined;
   }
 
   /**
@@ -53,8 +72,16 @@ export class CognitiveCollection extends CognitiveResource {
    * @returns The current CognitiveCollection instance for chaining.
    */
   setFilters(filters: Record<string, unknown>): CognitiveCollection {
-    this._filters = filters;
+    this.#filters = { ...filters };
     return this;
+  }
+
+  /**
+   * ✨ Gets the filter criteria for the collection.
+   * @returns The filters object, or undefined if not set.
+   */
+  getFilters(): Record<string, unknown> | undefined {
+    return this.#filters ? { ...this.#filters } : undefined;
   }
 
   /**
@@ -63,8 +90,16 @@ export class CognitiveCollection extends CognitiveResource {
    * @returns The current CognitiveCollection instance for chaining.
    */
   setAggregates(aggregates: Record<string, unknown>): CognitiveCollection {
-    this._aggregates = aggregates;
+    this.#aggregates = { ...aggregates };
     return this;
+  }
+
+  /**
+   * ✨ Gets the aggregates for the collection.
+   * @returns The aggregates object, or undefined if not set.
+   */
+  getAggregates(): Record<string, unknown> | undefined {
+    return this.#aggregates ? { ...this.#aggregates } : undefined;
   }
 
   /**
@@ -73,8 +108,11 @@ export class CognitiveCollection extends CognitiveResource {
    * @returns The current CognitiveCollection instance for chaining.
    */
   addItem(item: CognitiveResource): CognitiveCollection {
-    // Optional: Could add a check here to ensure item._type matches this._itemType
-    this._items.push(item);
+    // Type check to ensure item type matches collection itemType
+    if (item.getType() !== this.#itemType) {
+      throw new Error(`Item type '${item.getType()}' does not match collection item type '${this.#itemType}'`);
+    }
+    this.#items.push(item);
     return this;
   }
 
@@ -83,7 +121,15 @@ export class CognitiveCollection extends CognitiveResource {
    * @returns A shallow copy of the items array.
    */
   getItems(): CognitiveResource[] {
-    return [...this._items]; // Return a copy
+    return [...this.#items];
+  }
+
+  /**
+   * ✨ Gets the count of items in the collection
+   * @returns The number of items
+   */
+  getItemCount(): number {
+    return this.#items.length;
   }
 
   /**
@@ -92,29 +138,130 @@ export class CognitiveCollection extends CognitiveResource {
    * @returns A JSON representation of the collection.
    */
   override toJSON(): Record<string, unknown> {
-    // Start with the base resource serialization (includes _id, _type, itemType, _actions etc.)
+    // Start with the base resource serialization
     const baseJson = super.toJSON();
 
     // Add collection-specific properties
-    const result = {
+    const result: Record<string, unknown> = {
       ...baseJson,
-      items: this._items.map(item => item.toJSON()), // Serialize each item
-      pagination: this._pagination,
-      filters: this._filters,
-      aggregates: this._aggregates,
+      items: this.#items.map(item => item.toJSON()),
     };
 
-    // Remove extensions if they are empty (handled by super.toJSON for _actions etc.)
-    // Explicitly remove collection ones if they are added and empty later
-    if (!result.pagination) delete result.pagination;
-    if (!result.filters || Object.keys(result.filters).length === 0) delete result.filters;
-    if (!result.aggregates || Object.keys(result.aggregates).length === 0) delete result.aggregates;
+    // Add optional properties if present
+    if (this.#pagination) {
+      result.pagination = this.#pagination;
+    }
+    
+    if (this.#filters && Object.keys(this.#filters).length > 0) {
+      result.filters = this.#filters;
+    }
+    
+    if (this.#aggregates && Object.keys(this.#aggregates).length > 0) {
+      result.aggregates = this.#aggregates;
+    }
 
     return result;
   }
 }
 
-// --- Future Type Definitions (Placeholder) ---
+/**
+ * 🏗️ Builder for creating CognitiveCollection instances
+ */
+export class CollectionBuilder {
+  #id: string;
+  #itemType: string;
+  #items: CognitiveResource[] = [];
+  #pagination?: PaginationInfo;
+  #filters?: Record<string, unknown>;
+  #aggregates?: Record<string, unknown>;
+
+  /**
+   * Create a new CollectionBuilder
+   * @param id - Collection identifier
+   * @param itemType - Type of items in the collection
+   */
+  constructor(id: string, itemType: string) {
+    this.#id = id;
+    this.#itemType = itemType;
+  }
+
+  /**
+   * Add an item to the collection
+   */
+  item(resource: CognitiveResource): CollectionBuilder {
+    if (resource.getType() !== this.#itemType) {
+      throw new Error(`Item type '${resource.getType()}' does not match collection item type '${this.#itemType}'`);
+    }
+    this.#items.push(resource);
+    return this;
+  }
+
+  /**
+   * Add multiple items to the collection
+   */
+  items(resources: CognitiveResource[]): CollectionBuilder {
+    for (const resource of resources) {
+      this.item(resource); // This will perform type checking
+    }
+    return this;
+  }
+
+  /**
+   * Set pagination information
+   */
+  pagination(info: PaginationInfo): CollectionBuilder {
+    this.#pagination = info;
+    return this;
+  }
+
+  /**
+   * Set filter criteria
+   */
+  filters(filters: Record<string, unknown>): CollectionBuilder {
+    this.#filters = { ...filters };
+    return this;
+  }
+
+  /**
+   * Set aggregate data
+   */
+  aggregates(aggregates: Record<string, unknown>): CollectionBuilder {
+    this.#aggregates = { ...aggregates };
+    return this;
+  }
+
+  /**
+   * Build the CognitiveCollection instance
+   */
+  build(): CognitiveCollection {
+    const collection = new CognitiveCollection({
+      id: this.#id,
+      itemType: this.#itemType,
+      items: this.#items
+    });
+
+    if (this.#pagination) {
+      collection.setPagination(this.#pagination);
+    }
+
+    if (this.#filters) {
+      collection.setFilters(this.#filters);
+    }
+
+    if (this.#aggregates) {
+      collection.setAggregates(this.#aggregates);
+    }
+
+    return collection;
+  }
+
+  /**
+   * Create a CollectionBuilder for the given id and itemType
+   */
+  static of(id: string, itemType: string): CollectionBuilder {
+    return new CollectionBuilder(id, itemType);
+  }
+}
 
 /**
  * ⚙️ Pagination information for a collection.
