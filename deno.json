@@ -1,7 +1,15 @@
 {
+  "name": "cognitive-hypermedia",
+  "version": "0.1.0",
+  "description": "A framework for creating cognitive hypermedia applications with stateful resources",
+  "authors": ["radualexandrucosmin@gmail.com"],
+  "license": "MIT",
+  "repository": "https://github.com/yourusername/cognitive-hypermedia",
   "tasks": {
-    "start": "deno run --allow-net --allow-read --allow-write --unstable-kv src/main.ts",
-    "dev": "deno run --watch --allow-net --allow-read --allow-write --unstable-kv src/main.ts",
+    "start": "deno run --allow-net --allow-read --allow-write --unstable-kv mod.ts",
+    "dev": "deno run --watch --allow-net --allow-read --allow-write --unstable-kv mod.ts",
+    "example:todo": "deno run --allow-net --allow-read --allow-write --unstable-kv examples/todo/app.ts",
+    "example:todo:dev": "deno run --watch --allow-net --allow-read --allow-write --unstable-kv examples/todo/app.ts",
     "test": "deno test --allow-net --allow-read --allow-write --unstable-kv",
     "test:watch": "deno test --watch --allow-net --allow-read --allow-write --unstable-kv",
     "test:coverage": "deno test --coverage=coverage --allow-net --allow-read --allow-write --unstable-kv && deno coverage coverage"
@@ -11,6 +19,10 @@
     "@modelcontextprotocol/sdk/server/mcp.js": "npm:@modelcontextprotocol/sdk",
     "@modelcontextprotocol/sdk/server/stdio.js": "npm:@modelcontextprotocol/sdk",
     "zod": "npm:zod"
+  },
+  "exports": {
+    ".": "./mod.ts",
+    "./deno": "./mod.ts"
   },
   "nodeModulesDir": "auto"
 }
