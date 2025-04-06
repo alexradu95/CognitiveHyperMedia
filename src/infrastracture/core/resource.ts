@@ -222,6 +222,9 @@ export class CognitiveResource {
     if (this._state) {
       result._state = this._state;
     }
+    if (Object.keys(this._relationships).length > 0) {
+      result._relationships = this._relationships;
+    }
     if (Object.keys(this._presentation).length > 0) {
       result.presentation = this._presentation;
     }

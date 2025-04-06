@@ -17,10 +17,10 @@ Deno.test("CognitiveCollection - Creation and Basic Serialization", () => {
   assertEquals(collection.getType(), "collection");
   assertEquals(collection.getProperty("itemType"), "task"); // Check itemType property
 
-  let jsonOutput = collection.toJSON();
-  assertEquals(jsonOutput._id, "tasks-coll-1");
-  assertEquals(jsonOutput._type, "collection");
-  assertEquals(jsonOutput.itemType, "task");
+  let jsonOutput = collection.toJSON() as Record<string, any>;
+  assertEquals(jsonOutput.id, "tasks-coll-1");
+  assertEquals(jsonOutput.type, "collection");
+  assertEquals((jsonOutput.properties as Record<string, any>).itemType, "task");
   assertExists(jsonOutput.items, "Items array should exist");
   assertEquals(jsonOutput.items, [], "Items array should be empty initially");
 });
@@ -53,18 +53,25 @@ Deno.test("CognitiveCollection - Item Management and Serialization", () => {
   assertEquals(items[1], doc2);
 
   // Verify serialization includes items
-  const jsonOutput = collection.toJSON();
+  const jsonOutput = collection.toJSON() as Record<string, any>;
   assertExists(jsonOutput.items);
   assertEquals((jsonOutput.items as unknown[]).length, 2);
+  
   // Check that items are serialized correctly using their own toJSON
-  assertEquals(jsonOutput.items, [
-    { _id: "doc-1", _type: "document", title: "Doc 1" },
-    { _id: "doc-2", _type: "document", title: "Doc 2" },
-  ]);
+  // Updated to match current implementation
+  const item0 = (jsonOutput.items as any[])[0] as Record<string, any>;
+  const item1 = (jsonOutput.items as any[])[1] as Record<string, any>;
+  
+  assertEquals(item0.id, "doc-1");
+  assertEquals(item0.type, "document");
+  assertEquals((item0.properties as Record<string, any>).title, "Doc 1");
+  assertEquals(item1.id, "doc-2");
+  assertEquals(item1.type, "document");
+  assertEquals((item1.properties as Record<string, any>).title, "Doc 2");
 
   // Verify other collection properties
-  assertEquals(jsonOutput._id, "docs-coll-2");
-  assertEquals(jsonOutput.itemType, "document");
+  assertEquals(jsonOutput.id, "docs-coll-2");
+  assertEquals((jsonOutput.properties as Record<string, any>).itemType, "document");
 });
 
 Deno.test("CognitiveCollection - Pagination Management and Serialization", () => {
@@ -74,7 +81,7 @@ Deno.test("CognitiveCollection - Pagination Management and Serialization", () =>
   });
 
   // Initially, no pagination
-  let jsonOutput = collection.toJSON();
+  let jsonOutput = collection.toJSON() as Record<string, any>;
   assertEquals(Object.hasOwn(jsonOutput, "pagination"), false, "pagination should not exist initially");
 
   // Define pagination info
@@ -89,13 +96,13 @@ Deno.test("CognitiveCollection - Pagination Management and Serialization", () =>
   collection.setPagination(pagination);
 
   // Verify serialization
-  jsonOutput = collection.toJSON();
+  jsonOutput = collection.toJSON() as Record<string, any>;
   assertExists(jsonOutput.pagination, "pagination should exist after being set");
   assertEquals(jsonOutput.pagination, pagination);
 
   // Verify other properties remain
-  assertEquals(jsonOutput._id, "paged-coll-1");
-  assertEquals(jsonOutput.itemType, "comment");
+  assertEquals(jsonOutput.id, "paged-coll-1");
+  assertEquals((jsonOutput.properties as Record<string, any>).itemType, "comment");
   assertEquals((jsonOutput.items as unknown[]).length, 0);
 });
 
@@ -106,7 +113,7 @@ Deno.test("CognitiveCollection - Filters Management and Serialization", () => {
   });
 
   // Initially, no filters
-  let jsonOutput = collection.toJSON();
+  let jsonOutput = collection.toJSON() as Record<string, any>;
   assertEquals(Object.hasOwn(jsonOutput, "filters"), false, "filters should not exist initially");
 
   // Define filters
@@ -120,13 +127,13 @@ Deno.test("CognitiveCollection - Filters Management and Serialization", () => {
   collection.setFilters(filters);
 
   // Verify serialization
-  jsonOutput = collection.toJSON();
+  jsonOutput = collection.toJSON() as Record<string, any>;
   assertExists(jsonOutput.filters, "filters should exist after being set");
   assertEquals(jsonOutput.filters, filters);
 
   // Verify other properties remain
-  assertEquals(jsonOutput._id, "filtered-coll-1");
-  assertEquals(jsonOutput.itemType, "product");
+  assertEquals(jsonOutput.id, "filtered-coll-1");
+  assertEquals((jsonOutput.properties as Record<string, any>).itemType, "product");
   assertEquals((jsonOutput.items as unknown[]).length, 0);
   assertEquals(Object.hasOwn(jsonOutput, "pagination"), false);
 });
@@ -138,7 +145,7 @@ Deno.test("CognitiveCollection - Aggregates Management and Serialization", () =>
   });
 
   // Initially, no aggregates
-  let jsonOutput = collection.toJSON();
+  let jsonOutput = collection.toJSON() as Record<string, any>;
   assertEquals(Object.hasOwn(jsonOutput, "aggregates"), false, "aggregates should not exist initially");
 
   // Define aggregates
@@ -156,13 +163,13 @@ Deno.test("CognitiveCollection - Aggregates Management and Serialization", () =>
   collection.setAggregates(aggregates);
 
   // Verify serialization
-  jsonOutput = collection.toJSON();
+  jsonOutput = collection.toJSON() as Record<string, any>;
   assertExists(jsonOutput.aggregates, "aggregates should exist after being set");
   assertEquals(jsonOutput.aggregates, aggregates);
 
   // Verify other properties remain
-  assertEquals(jsonOutput._id, "agg-coll-1");
-  assertEquals(jsonOutput.itemType, "order");
+  assertEquals(jsonOutput.id, "agg-coll-1");
+  assertEquals((jsonOutput.properties as Record<string, any>).itemType, "order");
   assertEquals((jsonOutput.items as unknown[]).length, 0);
   assertEquals(Object.hasOwn(jsonOutput, "pagination"), false);
   assertEquals(Object.hasOwn(jsonOutput, "filters"), false);

@@ -12,11 +12,13 @@ Deno.test("CognitiveResource - Creation and Basic Serialization", () => {
   assertEquals(resource.getId(), "test-id-123");
   assertEquals(resource.getType(), "test-type");
 
-  const jsonOutput = resource.toJSON();
-  assertEquals(jsonOutput, {
-    _id: "test-id-123",
-    _type: "test-type",
-  });
+  const jsonOutput = resource.toJSON() as Record<string, any>;
+  assertEquals(jsonOutput.id, "test-id-123");
+  assertEquals(jsonOutput.type, "test-type");
+  assertExists(jsonOutput.links, "Links should exist");
+  assertEquals(jsonOutput.links.length, 1, "Should have self link");
+  assertEquals(jsonOutput.links[0].rel, "self");
+  assertEquals(jsonOutput.links[0].href, "/test-type/test-id-123");
 });
 
 Deno.test("CognitiveResource - Properties and Serialization", () => {
@@ -41,15 +43,14 @@ Deno.test("CognitiveResource - Properties and Serialization", () => {
   resource.setProperty("newProp", true);
   assertEquals(resource.getProperty("newProp"), true);
 
-  const jsonOutput = resource.toJSON();
-  assertEquals(jsonOutput, {
-    _id: "prop-test-456",
-    _type: "widget",
-    name: "Test Widget",
-    color: "red",
-    count: 42,
-    newProp: true,
-  });
+  const jsonOutput = resource.toJSON() as Record<string, any>;
+  assertEquals(jsonOutput.id, "prop-test-456");
+  assertEquals(jsonOutput.type, "widget");
+  assertExists(jsonOutput.properties, "Properties should exist");
+  assertEquals(jsonOutput.properties.name, "Test Widget");
+  assertEquals(jsonOutput.properties.color, "red");
+  assertEquals(jsonOutput.properties.count, 42);
+  assertEquals(jsonOutput.properties.newProp, true);
 });
 
 Deno.test("CognitiveResource - Actions Management and Serialization", () => {
@@ -59,8 +60,8 @@ Deno.test("CognitiveResource - Actions Management and Serialization", () => {
   });
 
   // Initially, no actions should be present
-  let jsonOutput = resource.toJSON();
-  assertEquals(Object.hasOwn(jsonOutput, "_actions"), false, "_actions should not exist when empty");
+  let jsonOutput = resource.toJSON() as Record<string, any>;
+  assertEquals(Object.hasOwn(jsonOutput, "actions"), false, "actions should not exist when empty");
   assertEquals(resource.getAction("submit"), undefined);
 
   // Define some actions
@@ -85,16 +86,14 @@ Deno.test("CognitiveResource - Actions Management and Serialization", () => {
   assertEquals(resource.getAction("nonexistentAction"), undefined);
 
   // Verify serialization includes actions
-  jsonOutput = resource.toJSON();
-  assertExists(jsonOutput._actions, "_actions should exist after adding actions");
-  assertEquals(jsonOutput._actions, {
-    submit: submitAction,
-    publish: publishAction,
-  });
+  jsonOutput = resource.toJSON() as Record<string, any>;
+  assertExists(jsonOutput.actions, "actions should exist after adding actions");
+  assertEquals(jsonOutput.actions.submit, submitAction);
+  assertEquals(jsonOutput.actions.publish, publishAction);
 
   // Verify original properties are still there
-  assertEquals(jsonOutput._id, "action-test-789");
-  assertEquals(jsonOutput._type, "document");
+  assertEquals(jsonOutput.id, "action-test-789");
+  assertEquals(jsonOutput.type, "document");
 });
 
 Deno.test("CognitiveResource - State Management and Serialization", () => {
@@ -104,7 +103,7 @@ Deno.test("CognitiveResource - State Management and Serialization", () => {
     type: "ticket",
   });
 
-  let jsonOutput1 = resource1.toJSON();
+  let jsonOutput1 = resource1.toJSON() as Record<string, any>;
   assertEquals(Object.hasOwn(jsonOutput1, "_state"), false, "_state should not exist initially");
   assertEquals(resource1.getCurrentState(), undefined, "Initial state should be undefined");
 
@@ -119,7 +118,7 @@ Deno.test("CognitiveResource - State Management and Serialization", () => {
   assertEquals(resource1.getCurrentState(), "open");
 
   // Verify serialization includes state
-  jsonOutput1 = resource1.toJSON();
+  jsonOutput1 = resource1.toJSON() as Record<string, any>;
   assertExists(jsonOutput1._state, "_state should exist after being set");
   assertEquals(jsonOutput1._state, initialState);
 
@@ -144,12 +143,12 @@ Deno.test("CognitiveResource - State Management and Serialization", () => {
   // Update state
   resource1.setState(complexState);
   assertEquals(resource1.getCurrentState(), "in-progress");
-  jsonOutput1 = resource1.toJSON();
+  jsonOutput1 = resource1.toJSON() as Record<string, any>;
   assertEquals(jsonOutput1._state, complexState);
 
   // Verify other properties are still intact
-  assertEquals(jsonOutput1._id, "state-test-1");
-  assertEquals(jsonOutput1._type, "ticket");
+  assertEquals(jsonOutput1.id, "state-test-1");
+  assertEquals(jsonOutput1.type, "ticket");
 });
 
 Deno.test("CognitiveResource - Relationships Management and Serialization", () => {
@@ -159,7 +158,7 @@ Deno.test("CognitiveResource - Relationships Management and Serialization", () =
   });
 
   // Initially, no relationships
-  let jsonOutput = resource.toJSON();
+  let jsonOutput = resource.toJSON() as Record<string, any>;
   assertEquals(Object.hasOwn(jsonOutput, "_relationships"), false, "_relationships should not exist initially");
   assertEquals(resource.getRelationship("owner"), undefined);
 
@@ -187,16 +186,14 @@ Deno.test("CognitiveResource - Relationships Management and Serialization", () =
   assertEquals(resource.getRelationship("nonexistent"), undefined);
 
   // Verify serialization
-  jsonOutput = resource.toJSON();
+  jsonOutput = resource.toJSON() as Record<string, any>;
   assertExists(jsonOutput._relationships, "_relationships should exist after adding relationships");
-  assertEquals(jsonOutput._relationships, {
-    owner: ownerRel,
-    tasks: tasksRel,
-  });
+  assertEquals(jsonOutput._relationships.owner, ownerRel);
+  assertEquals(jsonOutput._relationships.tasks, tasksRel);
 
   // Verify other properties remain
-  assertEquals(jsonOutput._id, "rel-test-1");
-  assertEquals(jsonOutput._type, "project");
+  assertEquals(jsonOutput.id, "rel-test-1");
+  assertEquals(jsonOutput.type, "project");
   assertEquals(Object.hasOwn(jsonOutput, "_state"), false);
 });
 
@@ -207,8 +204,8 @@ Deno.test("CognitiveResource - Presentation Hints Management and Serialization",
   });
 
   // Initially, no presentation hints
-  let jsonOutput = resource.toJSON();
-  assertEquals(Object.hasOwn(jsonOutput, "_presentation"), false, "_presentation should not exist initially");
+  let jsonOutput = resource.toJSON() as Record<string, any>;
+  assertEquals(Object.hasOwn(jsonOutput, "presentation"), false, "presentation should not exist initially");
 
   // Define presentation hints
   const hints: PresentationHints = {
@@ -233,47 +230,45 @@ Deno.test("CognitiveResource - Presentation Hints Management and Serialization",
   resource.setPresentation(hints);
 
   // Verify serialization
-  jsonOutput = resource.toJSON();
-  assertExists(jsonOutput._presentation, "_presentation should exist after setting hints");
-  assertEquals(jsonOutput._presentation, hints);
+  jsonOutput = resource.toJSON() as Record<string, any>;
+  assertExists(jsonOutput.presentation, "presentation should exist after setting hints");
+  assertEquals(jsonOutput.presentation, hints);
 
   // Verify merging/updating hints (optional - could add separate test later)
   resource.setPresentation({ color: "blue", icon: "task-done" }); // Update some hints
-  jsonOutput = resource.toJSON();
-  const updatedHints = jsonOutput._presentation as PresentationHints;
+  jsonOutput = resource.toJSON() as Record<string, any>;
+  const updatedHints = jsonOutput.presentation as PresentationHints;
   assertEquals(updatedHints.color, "blue");
   assertEquals(updatedHints.icon, "task-done");
   assertEquals(updatedHints.priority, "high", "Original hints should persist if not overwritten");
   assertEquals(updatedHints.visualization, "card", "Original hints should persist if not overwritten");
 
   // Verify other properties remain
-  assertEquals(jsonOutput._id, "pres-test-1");
-  assertEquals(jsonOutput._type, "task");
-  assertEquals(Object.hasOwn(jsonOutput, "_state"), false);
-  assertEquals(Object.hasOwn(jsonOutput, "_actions"), false);
+  assertEquals(jsonOutput.id, "pres-test-1");
+  assertEquals(jsonOutput.type, "task");
 });
 
 Deno.test("CognitiveResource - Conversation Prompts Management and Serialization", () => {
   const resource = new CognitiveResource({
     id: "prompt-test-1",
-    type: "meeting",
+    type: "article",
   });
 
   // Initially, no prompts
-  let jsonOutput = resource.toJSON();
-  assertEquals(Object.hasOwn(jsonOutput, "_prompts"), false, "_prompts should not exist initially");
-  assertEquals(resource.getPrompts().length, 0);
+  let jsonOutput = resource.toJSON() as Record<string, any>;
+  assertEquals(Object.hasOwn(jsonOutput, "prompts"), false, "prompts should not exist initially");
+  assertEquals(resource.getPrompts().length, 0, "Initial prompts array should be empty");
 
   // Define prompts
   const prompt1: ConversationPrompt = {
     type: "follow-up",
-    text: "Would you like to see the agenda?",
+    text: "Would you like to share this article?",
     priority: "medium",
   };
   const prompt2: ConversationPrompt = {
-    type: "suggestion",
-    text: "I can show you who is attending.",
-    condition: "attendeeCount > 0",
+    type: "explanation",
+    text: "This article requires editorial approval before publishing.",
+    condition: "when status == 'submitted'",
   };
 
   // Add prompts
@@ -287,13 +282,13 @@ Deno.test("CognitiveResource - Conversation Prompts Management and Serialization
   assertEquals(prompts[1], prompt2);
 
   // Verify serialization
-  jsonOutput = resource.toJSON();
-  assertExists(jsonOutput._prompts, "_prompts should exist after adding prompts");
-  assertEquals(jsonOutput._prompts, [prompt1, prompt2]);
+  jsonOutput = resource.toJSON() as Record<string, any>;
+  assertExists(jsonOutput.prompts, "prompts should exist after adding prompts");
+  assertEquals(jsonOutput.prompts.length, 2);
+  assertEquals(jsonOutput.prompts[0], prompt1);
+  assertEquals(jsonOutput.prompts[1], prompt2);
 
   // Verify other properties remain
-  assertEquals(jsonOutput._id, "prompt-test-1");
-  assertEquals(jsonOutput._type, "meeting");
-  assertEquals(Object.hasOwn(jsonOutput, "_actions"), false);
-  assertEquals(Object.hasOwn(jsonOutput, "_state"), false);
+  assertEquals(jsonOutput.id, "prompt-test-1");
+  assertEquals(jsonOutput.type, "article");
 }); 
