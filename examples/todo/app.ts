@@ -2,9 +2,17 @@
 import { 
   DenoKvAdapter,
   StateMachineDefinition, 
-  createMcpBridge,
+  createBridge,
   CognitiveStore
 } from "../../mod.ts";
+
+// Add Protocol related imports
+import { ProtocolFactory } from "../../src/adapters/protocol/protocol_factory.ts";
+
+// Add MCP SDK imports
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
 
 // Todo App specific state machine definition
 const taskStateMachineDefinition: StateMachineDefinition = {
@@ -19,27 +27,111 @@ const taskStateMachineDefinition: StateMachineDefinition = {
   },
 };
 
-async function main() {
-  console.log("🚀 Starting Todo App Server...");
+async function setupMcpServer(store: CognitiveStore) {
+  // Create an MCP server
+  const server = new McpServer({
+    name: "Todo App",
+    version: "1.0.0"
+  });
 
-  // --- Initialize Dependencies ---
-  let kv;
-  try {
-    // Try the current API first
-    kv = await Deno.openKv(); 
-  } catch (error: unknown) {
-    console.error("Error initializing KV:", error instanceof Error ? error.message : String(error));
-    console.log("Please make sure you're using the latest Deno version and running with --unstable-kv flag");
-    console.log("If problems persist, check the Deno KV documentation for API changes");
-    Deno.exit(1);
-  }
-  const kvAdapter = new DenoKvAdapter(kv);
-  const store = new CognitiveStore(kvAdapter);
-  const bridge = createMcpBridge(store);
+  // List tasks resource
+  server.resource(
+    "tasks",
+    "tasks://list",
+    async (uri: URL) => {
+      const tasks = await store.getCollection("task");
+      return {
+        contents: [{
+          uri: uri.href,
+          text: JSON.stringify(tasks, null, 2)
+        }]
+      };
+    }
+  );
 
-  // --- Register State Machines ---
-  store.registerStateMachine("task", taskStateMachineDefinition);
-  console.log("✅ State machines registered.");
+  // Get task by ID
+  server.resource(
+    "task",
+    new ResourceTemplate("task://{id}", { list: undefined }),
+    async (uri: URL, { id }: { id: string }) => {
+      const task = await store.get("task", id);
+      return {
+        contents: [{
+          uri: uri.href,
+          text: task ? JSON.stringify(task, null, 2) : "Task not found"
+        }]
+      };
+    }
+  );
+
+  // Create task tool
+  server.tool(
+    "create-task",
+    { title: z.string(), description: z.string().optional() },
+    async ({ title, description }: { title: string, description?: string }) => {
+      const newTask = {
+        title,
+        description: description || "",
+        state: "pending",
+        createdAt: new Date().toISOString()
+      };
+      
+      const id = await store.create("task", newTask);
+      
+      return {
+        content: [{ 
+          type: "text", 
+          text: `Task created with ID: ${id}` 
+        }]
+      };
+    }
+  );
+
+  // Transition task state tool
+  server.tool(
+    "transition-task",
+    { 
+      id: z.string(), 
+      action: z.string()
+    },
+    async ({ id, action }: { id: string, action: string }) => {
+      try {
+        const result = await store.performAction("task", id, action);
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Task ${id} transitioned with action: ${action}. New state: ${result?.getProperty("status") || "unknown"}` 
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Error: ${error instanceof Error ? error.message : String(error)}` 
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // Start receiving messages via stdio transport
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.log("✅ MCP server connected via stdio transport.");
+
+  return server;
+}
+
+async function startHttpServer(store: CognitiveStore) {
+  // Create the protocol adapter using the factory
+  const adapter = ProtocolFactory.createMcpAdapter(store, {
+    name: "Todo App HTTP Server",
+    version: "1.0.0"
+  });
+  
+  const bridge = createBridge(store, adapter);
+  console.log("✅ HTTP bridge created.");
 
   // --- Define HTTP Request Handler ---
   const handler = async (req: Request): Promise<Response> => {
@@ -65,24 +157,25 @@ async function main() {
       // --- MCP Command Routing based on Method and Path ---
       if (method === 'GET') {
         // Explore (Resource or Collection)
-        const command = { uri: url.pathname + url.search }; // Pass full URI with query params
-        mcpResponse = await bridge.handleExplore(command);
+        const uri = url.pathname + url.search; // Pass full URI with query params
+        mcpResponse = await bridge.explore(uri);
       } else if (method === 'POST') {
         if (pathParts.length === 1) {
           // Create Resource
            if (!payload) {
                 mcpResponse = { status: 400, body: { error: "Missing request body for create" } };
            } else {
-                const command = { uri: url.pathname, payload };
-                mcpResponse = await bridge.handleCreate(command);
+                const uri = url.pathname;
+                mcpResponse = await bridge.create(uri, payload);
            }
         } else if (pathParts.length === 3) {
           // Act on Resource (/type/id/action)
           const type = pathParts[0];
           const id = pathParts[1];
           const actionName = pathParts[2];
-          const command = { uri: `/${type}/${id}`, action: actionName, payload }; // Construct URI without action
-          mcpResponse = await bridge.handleAct(command);
+
+          const uri = `/${type}/${id}`;
+          mcpResponse = await bridge.act(uri, actionName, payload);
         } else {
            mcpResponse = { status: 400, body: { error: "Invalid POST request path. Use /type for create or /type/id/action for act." } };
         }
@@ -117,7 +210,39 @@ async function main() {
   // --- Start Server ---
   const port = 8000;
   console.log(`👂 Listening on http://localhost:${port}`);
-  await Deno.serve({ port }, handler);
+  Deno.serve({ port, handler });
+}
+
+async function main() {
+  console.log("🚀 Starting Todo App...");
+
+  // --- Initialize Dependencies ---
+  let kv;
+  try {
+    // Try the current API first
+    kv = await Deno.openKv(); 
+  } catch (error: unknown) {
+    console.error("Error initializing KV:", error instanceof Error ? error.message : String(error));
+    console.log("Please make sure you're using the latest Deno version and running with --unstable-kv flag");
+    console.log("If problems persist, check the Deno KV documentation for API changes");
+    Deno.exit(1);
+  }
+  const kvAdapter = new DenoKvAdapter(kv);
+  const store = new CognitiveStore(kvAdapter);
+  
+  // --- Register State Machines ---
+  store.registerStateMachine("task", taskStateMachineDefinition);
+  console.log("✅ State machines registered.");
+
+  // Determine which server type to start based on environment variable
+  const serverType = Deno.env.get("SERVER_TYPE") || "mcp";
+  
+  if (serverType === "http") {
+    await startHttpServer(store);
+  } else {
+    // Default to MCP server for Claude Desktop integration
+    await setupMcpServer(store);
+  }
 }
 
 // Run the main function

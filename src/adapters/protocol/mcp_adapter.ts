@@ -1,35 +1,19 @@
 import { McpError } from "../../infrastracture/core/errors.ts";
 import { IProtocolAdapter, CognitiveStore, NavigationAdapter, ProtocolError, ProtocolResponse } from "../../main.ts";
 import { z } from "zod";
+// Using npm: prefix for npm packages in Deno
+import { McpServer } from "npm:@modelcontextprotocol/sdk/server/mcp.js";
 
-// Mock interfaces for testing purposes
-interface McpServer {
-  tool(name: string, schema: any, handler: (params: any) => Promise<any>): void;
-  connect(transport: McpServerTransport): Promise<void>;
-}
-
+// Define a basic interface for MCP transports compatible with Transport from the SDK
 interface McpServerTransport {
-  clientMeta: { name: string; version: string };
-  serverMeta: { name: string; version: string };
-  onRequest(requestType: string, callback: (request: any) => Promise<any>): void;
-  sendRequest(request: any): Promise<any>;
-  connect(): Promise<void>;
+  // Properties from Transport interface
+  start(): Promise<void>;
+  send(message: Record<string, unknown>): Promise<void>;
+  close(): Promise<void>;
+  onclose?: () => void;
+  onerror?: (error: Error) => void;
+  onmessage?: (message: Record<string, unknown>) => void;
 }
-
-// Create a basic implementation for testing
-class BasicMcpServer implements McpServer {
-  private tools: Record<string, { schema: any; handler: (params: any) => Promise<any> }> = {};
-
-  tool(name: string, schema: any, handler: (params: any) => Promise<any>): void {
-    this.tools[name] = { schema, handler };
-  }
-
-  async connect(transport: McpServerTransport): Promise<void> {
-    return Promise.resolve();
-  }
-}
-
-
 
 /**
  * 🌉 MCP-specific implementation of the protocol adapter.
@@ -50,7 +34,10 @@ export class McpProtocolAdapter implements IProtocolAdapter {
    */
   constructor(store: CognitiveStore, options: McpAdapterOptions = {}) {
     this.store = store;
-    this.mcp = new BasicMcpServer();
+    this.mcp = new McpServer({
+      name: options.name || "Cognitive Hypermedia Server",
+      version: options.version || "1.0.0"
+    });
     this.navigationAdapter = new NavigationAdapter(store);
   }
 
@@ -343,232 +330,222 @@ export class McpProtocolAdapter implements IProtocolAdapter {
    * 🧭 Register the MCP navigate tool
    */
   private registerNavigateTool(): void {
-    const navigateSchema = z.object({
-      uri: z.string().min(1, "URI is required"),
-      relation: z.string().min(1, "Relation is required"),
-      depth: z.number().optional(),
-      format: z.enum(["resource", "graph"]).optional(),
-    });
-
-    this.mcp.tool("navigate", navigateSchema, async (params: { 
-      uri: string; 
-      relation: string;
-      depth?: number;
-      format?: "resource" | "graph";
-    }) => {
-      try {
-        // Parse URI to get type and ID
-        const uriParts = params.uri.split('/').filter(Boolean);
-        if (uriParts.length !== 2 || !uriParts[0] || !uriParts[1]) {
-          return this.handleMcpError(
-            new McpError("Invalid URI for navigate. Expected /type/id.", "400"),
-            "navigate"
-          );
-        }
-        
-        const [type, id] = uriParts;
-        
-        // If the user wants a graph format, use createGraph instead of traverse
-        if (params.format === "graph") {
-          const graph = await this.navigationAdapter.createGraph(
-            type, 
-            id, 
-            params.depth || 2, 
-            [params.relation]
-          );
-          
-          return {
-            content: [
-              {
+    this.mcp.tool(
+      "navigate",
+      {
+        uri: z.string().min(1, "URI is required"),
+        relation: z.string().min(1, "Relation is required"),
+        depth: z.number().optional(),
+        format: z.enum(["resource", "graph"]).optional(),
+      },
+      async (args) => {
+        try {
+          // Parse URI to get type and ID
+          const uriParts = args.uri.split('/').filter(Boolean);
+          if (uriParts.length !== 2 || !uriParts[0] || !uriParts[1]) {
+            return {
+              content: [{
                 type: "text",
-                text: JSON.stringify(graph, null, 2)
-              }
-            ]
-          };
-        } else {
-          // Default to resource traversal
-          const result = await this.navigationAdapter.traverse(type, id, params.relation);
-          
-          if (!result) {
-            return this.handleMcpError(
-              new McpError(`No resources found with relation '${params.relation}'`, "404"),
-              "navigate"
-            );
+                text: `Invalid URI for navigate. Expected /type/id.`
+              }],
+              isError: true
+            };
           }
           
-          let responseText: string;
+          const [type, id] = uriParts;
           
-          if (Array.isArray(result)) {
-            responseText = JSON.stringify(
-              { 
+          // If the user wants a graph format, use createGraph instead of traverse
+          if (args.format === "graph") {
+            const graph = await this.navigationAdapter.createGraph(
+              type, 
+              id, 
+              args.depth || 2, 
+              [args.relation]
+            );
+            
+            return {
+              content: [{
+                type: "text",
+                text: JSON.stringify(graph, null, 2)
+              }]
+            };
+          } else {
+            // Default to resource traversal
+            const result = await this.navigationAdapter.traverse(type, id, args.relation);
+            
+            if (!result) {
+              return {
+                content: [{
+                  type: "text",
+                  text: `No resources found with relation '${args.relation}'`
+                }],
+                isError: true
+              };
+            }
+            
+            let responseText: string;
+            
+            if (Array.isArray(result)) {
+              responseText = JSON.stringify({ 
                 type: "collection", 
                 items: result.map(r => r.toJSON()),
                 count: result.length
-              }, 
-              null, 
-              2
-            );
-          } else {
-            responseText = JSON.stringify(result.toJSON(), null, 2);
-          }
-          
-          return {
-            content: [
-              {
+              }, null, 2);
+            } else {
+              responseText = JSON.stringify(result.toJSON(), null, 2);
+            }
+            
+            return {
+              content: [{
                 type: "text",
                 text: responseText
-              }
-            ]
+              }]
+            };
+          }
+        } catch (error) {
+          console.error(`Error in navigate tool:`, error);
+          return {
+            content: [{
+              type: "text",
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`
+            }],
+            isError: true
           };
         }
-      } catch (error) {
-        return this.handleMcpError(error, "navigate");
       }
-    });
+    );
   }
 
   /**
    * 🔍 Register the MCP explore tool
    */
   private registerExploreTool(): void {
-    const exploreSchema = z.object({
-      uri: z.string().min(1, "URI is required"),
-    });
-
-    this.mcp.tool("explore", exploreSchema, async (params: { uri: string }) => {
-      try {
-        const response = await this.explore(params.uri);
-        
-        if (response.status >= 200 && response.status < 300) {
-          return {
-            content: [
-              {
+    this.mcp.tool(
+      "explore",
+      {
+        uri: z.string().min(1, "URI is required"),
+      },
+      async (args) => {
+        try {
+          const response = await this.explore(args.uri);
+          
+          if (response.status >= 200 && response.status < 300) {
+            return {
+              content: [{
                 type: "text",
                 text: JSON.stringify(response.body, null, 2)
-              }
-            ]
+              }]
+            };
+          } else {
+            return {
+              content: [{
+                type: "text",
+                text: `Explore failed: ${response.body?.error || 'Unknown error'}`
+              }],
+              isError: true
+            };
+          }
+        } catch (error) {
+          console.error(`Error in explore tool:`, error);
+          return {
+            content: [{
+              type: "text",
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`
+            }],
+            isError: true
           };
-        } else {
-          return this.handleMcpError(
-            new McpError(`Explore failed: ${response.body?.error || 'Unknown error'}`, `${response.status}`),
-            "explore",
-          );
         }
-      } catch (error) {
-        return this.handleMcpError(error, "explore");
       }
-    });
+    );
   }
 
   /**
    * ⚡ Register the MCP act tool
    */
   private registerActTool(): void {
-    const actSchema = z.object({
-      uri: z.string().min(1, "URI is required"),
-      action: z.string().min(1, "Action name is required"),
-      payload: z.record(z.unknown()).optional(),
-    });
-
-    this.mcp.tool("act", actSchema, async (params: { uri: string; action: string; payload?: Record<string, unknown> }) => {
-      try {
-        const response = await this.act(params.uri, params.action, params.payload);
-        
-        if (response.status >= 200 && response.status < 300) {
-          return {
-            content: [
-              {
+    this.mcp.tool(
+      "act",
+      {
+        uri: z.string().min(1, "URI is required"),
+        action: z.string().min(1, "Action name is required"),
+        payload: z.record(z.unknown()).optional(),
+      },
+      async (args) => {
+        try {
+          const response = await this.act(args.uri, args.action, args.payload);
+          
+          if (response.status >= 200 && response.status < 300) {
+            return {
+              content: [{
                 type: "text",
                 text: response.body ? JSON.stringify(response.body, null, 2) : "Action completed successfully."
-              }
-            ]
+              }]
+            };
+          } else {
+            return {
+              content: [{
+                type: "text",
+                text: `Action failed: ${response.body?.error || 'Unknown error'}`
+              }],
+              isError: true
+            };
+          }
+        } catch (error) {
+          console.error(`Error in act tool:`, error);
+          return {
+            content: [{
+              type: "text",
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`
+            }],
+            isError: true
           };
-        } else {
-          return this.handleMcpError(
-            new McpError(`Action failed: ${response.body?.error || 'Unknown error'}`, `${response.status}`),
-            "act",
-          );
         }
-      } catch (error) {
-        return this.handleMcpError(error, "act");
       }
-    });
+    );
   }
 
   /**
    * ➕ Register the MCP create tool
    */
   private registerCreateTool(): void {
-    const createSchema = z.object({
-      uri: z.string().min(1, "URI is required"),
-      payload: z.record(z.unknown()).refine(val => Object.keys(val).length > 0, "Payload is required"),
-    });
-
-    this.mcp.tool("create", createSchema, async (params: { uri: string; payload: Record<string, unknown> }) => {
-      try {
-        const response = await this.create(params.uri, params.payload);
-        
-        if (response.status >= 200 && response.status < 300) {
-          return {
-            content: [
-              {
+    this.mcp.tool(
+      "create",
+      {
+        uri: z.string().min(1, "URI is required"),
+        payload: z.record(z.unknown()).refine(val => Object.keys(val).length > 0, "Payload is required"),
+      },
+      async (args) => {
+        try {
+          const response = await this.create(args.uri, args.payload);
+          
+          if (response.status >= 200 && response.status < 300) {
+            return {
+              content: [{
                 type: "text",
                 text: JSON.stringify(response.body, null, 2)
-              }
-            ]
+              }]
+            };
+          } else {
+            return {
+              content: [{
+                type: "text",
+                text: `Create failed: ${response.body?.error || 'Unknown error'}`
+              }],
+              isError: true
+            };
+          }
+        } catch (error) {
+          console.error(`Error in create tool:`, error);
+          return {
+            content: [{
+              type: "text",
+              text: `Error: ${error instanceof Error ? error.message : String(error)}`
+            }],
+            isError: true
           };
-        } else {
-          return this.handleMcpError(
-            new McpError(`Create failed: ${response.body?.error || 'Unknown error'}`, `${response.status}`),
-            "create",
-          );
         }
-      } catch (error) {
-        return this.handleMcpError(error, "create");
       }
-    });
-  }
-
-  /**
-   * 🚨 Handle errors in a way compatible with MCP tool responses
-   */
-  private handleMcpError(
-    error: unknown,
-    toolName: string,
-  ): { content: Array<{ type: string; text: string }>; isError: boolean } {
-    console.error(`Error in ${toolName} tool:`, error);
-    
-    let errorMessage = "An unknown error occurred";
-    let statusCode = 500;
-    
-    if (error instanceof Error) {
-      errorMessage = error.message;
-      
-      if ("status" in error && typeof (error as any).status === "number") {
-        statusCode = (error as any).status;
-      }
-    }
-    
-    // Create an appropriate error message based on status code
-    let userMessage = `Error (${statusCode}): ${errorMessage}`;
-    
-    if (statusCode === 404) {
-      userMessage = `Resource not found: ${errorMessage}`;
-    } else if (statusCode === 400) {
-      userMessage = `Invalid request: ${errorMessage}`;
-    } else if (statusCode === 403) {
-      userMessage = `Operation not allowed: ${errorMessage}`;
-    }
-    
-    return {
-      content: [
-        {
-          type: "text",
-          text: userMessage
-        }
-      ],
-      isError: true
-    };
+    );
   }
 }
 
