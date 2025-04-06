@@ -1,4 +1,11 @@
-import { McpServerTransport } from "@modelcontextprotocol/sdk/server/mcp.js";
+// Define an interface for the transport rather than importing the module
+export interface McpServerTransport {
+  clientMeta: { name: string; version: string };
+  serverMeta: { name: string; version: string };
+  onRequest(requestType: string, callback: (request: any) => Promise<any>): void;
+  sendRequest(request: any): Promise<any>;
+  connect(): Promise<void>;
+}
 
 /**
  * A mock implementation of McpServerTransport for testing
