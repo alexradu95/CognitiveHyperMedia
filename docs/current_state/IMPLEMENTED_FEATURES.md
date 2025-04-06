@@ -27,21 +27,25 @@
     *   Adds default actions (`update`, `delete`) if not overridden by state.
     *   Adds state-based info/actions/hints/prompts (using 'task' example).
     *   Adds relationship links based on `*Id` property naming convention.
-7.  **`McpBridge`:**
-    *   Factory `createMcpBridge` taking `CognitiveStore`.
-    *   Simplified MCP command/response types.
-    *   Implemented handlers (`handleExplore`, `handleAct`, `handleCreate`) translating between MCP concepts and Store methods.
-    *   Basic URI parsing and error mapping to HTTP status codes (400, 404, 403, 200, 201, 204, 500).
+7.  **Protocol Adapter Pattern:**
+    *   Defined `IProtocolAdapter` interface in `src/adapters/protocol/protocol_adapter.ts`
+    *   Implemented protocol-agnostic `CognitiveBridge` that works with any protocol adapter
+    *   Created `McpProtocolAdapter` implementing the interface specifically for MCP protocol
+    *   Added `ProtocolFactory` for creating different protocol adapters
+    *   Made protocol calls standardized through `explore()`, `act()`, and `create()` methods
+    *   Implemented error handling and response formatting for each protocol
+    *   Full test coverage for the bridge with mock components
+    *   Moved protocol implementations out of infrastructure for better separation of concerns
 8.  **Basic HTTP Server (`src/main.ts`):**
     *   Uses `Deno.serve` to listen for requests.
     *   Initializes Store and Bridge, registers sample state machine.
     *   Routes requests based on HTTP Method and Path (`GET /type/id`, `GET /type`, `POST /type`, `POST /type/id/action`) to appropriate bridge handlers.
     *   Parses JSON request bodies for `POST`.
-    *   Constructs JSON `Response` objects based on `McpResponse`.
+    *   Constructs JSON `Response` objects based on protocol responses.
 9.  **Testing:**
     *   Unit tests for `CognitiveStore` covering CRUD, collections, state integration, enhancements.
     *   Unit tests for `StateMachine`.
-    *   Unit tests for `McpBridge` handlers covering success and error cases.
+    *   Unit tests for protocol adapter implementations and bridge.
 10. **Strict State Action Checking:**
     *   `performAction` now strictly enforces that an action (including `update`/`delete`) must be present in the current state's `allowedActions` if a state machine is registered.
 11. **Storage Adapter Pattern:**
@@ -49,4 +53,4 @@
     *   Refactored `CognitiveStore` to be storage-agnostic, accepting any adapter implementing the interface
     *   Moved Deno KV implementation to `adapters/deno/kv_adapter.ts`
     *   Updated tests to use the adapter pattern
-    *   Made the framework core independent of specific storage technologies 
+    *   Made the framework core independent of specific storage technologies

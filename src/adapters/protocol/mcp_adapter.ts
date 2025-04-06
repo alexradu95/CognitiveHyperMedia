@@ -26,10 +26,10 @@ class BasicMcpServer implements McpServer {
 }
 
 import { z } from "zod";
-import { CognitiveStore } from "../store/store.ts";
+import { CognitiveStore } from "../../infrastracture/store/store.ts";
 import { IProtocolAdapter, ProtocolResponse, ProtocolError } from "./protocol_adapter.ts";
-import { ResourceNotFoundError, McpError } from "../core/errors.ts";
-import { CognitiveError } from "../core/types.ts";
+import { ResourceNotFoundError, McpError } from "../../infrastracture/core/errors.ts";
+import { CognitiveError } from "../../infrastracture/core/types.ts";
 
 /**
  * 🌉 MCP-specific implementation of the protocol adapter.
@@ -248,168 +248,153 @@ export class McpProtocolAdapter implements IProtocolAdapter {
     this.registerCreateTool();
   }
 
+  /**
+   * 🔍 Register the MCP explore tool
+   */
   private registerExploreTool(): void {
-    this.mcp.tool(
-      "explore",
-      z.object({
-        concept: z.string().describe("Resource type to explore"),
-        id: z.string().optional().describe("Specific resource ID"),
-        filter: z.record(z.any()).optional().describe("Filter criteria"),
-        pagination: z.object({
-          page: z.number().optional(),
-          pageSize: z.number().optional(),
-        }).optional().describe("Pagination options"),
-      }).describe("Navigate and explore resources and collections"),
-      async (params: {
-        concept: string;
-        id?: string;
-        filter?: Record<string, unknown>;
-        pagination?: {
-          page?: number;
-          pageSize?: number;
-        };
-      }) => {
-        try {
-          let result;
-          if (params.id) {
-            result = await this.store.get(params.concept, params.id);
-            if (!result) {
-              throw new ResourceNotFoundError(params.concept, params.id);
-            }
-          } else {
-            result = await this.store.getCollection(params.concept, {
-              filter: params.filter,
-              page: params.pagination?.page,
-              pageSize: params.pagination?.pageSize,
-            });
-          }
-          return {
-            content: [{
-              type: "text",
-              text: JSON.stringify(result, null, 2),
-            }],
-          };
-        } catch (error) {
-          return this.handleMcpError(error, "explore");
-        }
-      },
-    );
-  }
+    const exploreSchema = z.object({
+      uri: z.string().min(1, "URI is required"),
+    });
 
-  private registerActTool(): void {
-    this.mcp.tool(
-      "act",
-      z.object({
-        concept: z.string().describe("Resource type"),
-        id: z.string().describe("Resource ID"),
-        action: z.string().describe("Action to perform"),
-        parameters: z.record(z.any()).optional().describe("Action parameters"),
-      }).describe("Perform actions on resources"),
-      async (params: {
-        concept: string;
-        id: string;
-        action: string;
-        parameters?: Record<string, unknown>;
-      }) => {
-        try {
-          const result = await this.store.performAction(
-            params.concept,
-            params.id,
-            params.action,
-            params.parameters,
-          );
+    this.mcp.tool("explore", exploreSchema, async (params: { uri: string }) => {
+      try {
+        const response = await this.explore(params.uri);
+        
+        if (response.status >= 200 && response.status < 300) {
           return {
-            content: [{
-              type: "text",
-              text: JSON.stringify(result, null, 2),
-            }],
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(response.body, null, 2)
+              }
+            ]
           };
-        } catch (error) {
-          return this.handleMcpError(error, "act");
-        }
-      },
-    );
-  }
-
-  private registerCreateTool(): void {
-    this.mcp.tool(
-      "create",
-      z.object({
-        concept: z.string().describe("Resource type to create"),
-        data: z.record(z.any()).describe("Resource data"),
-      }).describe("Create new resources"),
-      async (params: {
-        concept: string;
-        data: Record<string, unknown>;
-      }) => {
-        try {
-          const result = await this.store.create(
-            params.concept,
-            params.data,
+        } else {
+          return this.handleMcpError(
+            new McpError(`Explore failed: ${response.body?.error || 'Unknown error'}`, `${response.status}`),
+            "explore",
           );
-          return {
-            content: [{
-              type: "text",
-              text: JSON.stringify(result, null, 2),
-            }],
-          };
-        } catch (error) {
-          return this.handleMcpError(error, "act");
         }
-      },
-    );
+      } catch (error) {
+        return this.handleMcpError(error, "explore");
+      }
+    });
   }
 
   /**
-   * 🚨 Handle errors during MCP tool execution
+   * ⚡ Register the MCP act tool
+   */
+  private registerActTool(): void {
+    const actSchema = z.object({
+      uri: z.string().min(1, "URI is required"),
+      action: z.string().min(1, "Action name is required"),
+      payload: z.record(z.unknown()).optional(),
+    });
+
+    this.mcp.tool("act", actSchema, async (params: { uri: string; action: string; payload?: Record<string, unknown> }) => {
+      try {
+        const response = await this.act(params.uri, params.action, params.payload);
+        
+        if (response.status >= 200 && response.status < 300) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: response.body ? JSON.stringify(response.body, null, 2) : "Action completed successfully."
+              }
+            ]
+          };
+        } else {
+          return this.handleMcpError(
+            new McpError(`Action failed: ${response.body?.error || 'Unknown error'}`, `${response.status}`),
+            "act",
+          );
+        }
+      } catch (error) {
+        return this.handleMcpError(error, "act");
+      }
+    });
+  }
+
+  /**
+   * ➕ Register the MCP create tool
+   */
+  private registerCreateTool(): void {
+    const createSchema = z.object({
+      uri: z.string().min(1, "URI is required"),
+      payload: z.record(z.unknown()).refine(val => Object.keys(val).length > 0, "Payload is required"),
+    });
+
+    this.mcp.tool("create", createSchema, async (params: { uri: string; payload: Record<string, unknown> }) => {
+      try {
+        const response = await this.create(params.uri, params.payload);
+        
+        if (response.status >= 200 && response.status < 300) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(response.body, null, 2)
+              }
+            ]
+          };
+        } else {
+          return this.handleMcpError(
+            new McpError(`Create failed: ${response.body?.error || 'Unknown error'}`, `${response.status}`),
+            "create",
+          );
+        }
+      } catch (error) {
+        return this.handleMcpError(error, "create");
+      }
+    });
+  }
+
+  /**
+   * 🚨 Handle errors in a way compatible with MCP tool responses
    */
   private handleMcpError(
     error: unknown,
     toolName: string,
   ): { content: Array<{ type: string; text: string }>; isError: boolean } {
-    console.error(`Error in MCP tool '${toolName}':`, error);
-
-    let cognitiveError: CognitiveError;
-
-    if (error instanceof ResourceNotFoundError) {
-      cognitiveError = {
-        _type: "error",
-        code: "resource_not_found",
-        message: error.message,
-      };
-    } else if (error instanceof McpError) {
-      cognitiveError = {
-        _type: "error",
-        code: error.code || `${toolName}_error`,
-        message: error.message,
-      };
-    } else if (error instanceof Error) {
-      cognitiveError = {
-        _type: "error",
-        code: `${toolName}_execution_error`,
-        message: `Failed to execute ${toolName}: ${error.message}`,
-        details: { stack: error.stack },
-      };
-    } else {
-      cognitiveError = {
-        _type: "error",
-        code: "unknown_error",
-        message: `An unknown error occurred during ${toolName} execution.`,
-      };
+    console.error(`Error in ${toolName} tool:`, error);
+    
+    let errorMessage = "An unknown error occurred";
+    let statusCode = 500;
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      
+      if ("status" in error && typeof (error as any).status === "number") {
+        statusCode = (error as any).status;
+      }
     }
-
+    
+    // Create an appropriate error message based on status code
+    let userMessage = `Error (${statusCode}): ${errorMessage}`;
+    
+    if (statusCode === 404) {
+      userMessage = `Resource not found: ${errorMessage}`;
+    } else if (statusCode === 400) {
+      userMessage = `Invalid request: ${errorMessage}`;
+    } else if (statusCode === 403) {
+      userMessage = `Operation not allowed: ${errorMessage}`;
+    }
+    
     return {
-      content: [{
-        type: "text",
-        text: JSON.stringify(cognitiveError, null, 2),
-      }],
-      isError: true,
+      content: [
+        {
+          type: "text",
+          text: userMessage
+        }
+      ],
+      isError: true
     };
   }
 }
 
 /**
- * Configuration options for the MCP adapter
+ * Options for MCP adapter creation
  */
 export interface McpAdapterOptions {
   name?: string;

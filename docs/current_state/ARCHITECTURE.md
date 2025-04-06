@@ -5,16 +5,19 @@
 ```mermaid
 graph LR
     Client[Client / curl] -- HTTP Request --> Server(src/main.ts Handler);
-    Server -- parses & routes --> Bridge(McpBridge Handlers);
-    Bridge -- calls --> Store(CognitiveStore);
+    Server -- parses & routes --> Bridge(CognitiveBridge);
+    Bridge -- routes to --> ProtoAdapter{IProtocolAdapter};
+    ProtoAdapter -- implements --> McpAdapter[McpProtocolAdapter];
+    ProtoAdapter -- could implement --> OpenAIAdapter[OpenAI or other protocols];
+    McpAdapter -- calls --> Store(CognitiveStore);
     Store -- interacts via --> Adapter{IStorageAdapter};
     Adapter -- implements --> DenoKV[DenoKvAdapter];
     Adapter -- could implement --> OtherDB[Other DB Adapters];
     Store -- uses --> SM(StateMachine);
     Store -- returns --> Resource[CognitiveResource / Collection];
-    Bridge -- formats --> McpResp{MCP Response};
+    ProtoAdapter -- formats --> Response{Protocol Response};
     Server -- creates --> HttpResp[HTTP Response];
-    McpResp --> HttpResp;
+    Response --> HttpResp;
     HttpResp -- HTTP Response --> Client;
 ```
 
@@ -85,4 +88,121 @@ classDiagram
     CognitiveStore --> IStorageAdapter : uses
     DenoKvAdapter ..|> IStorageAdapter : implements
     FutureAdapters ..|> IStorageAdapter : implements
+```
+
+## Protocol Adapter Pattern
+
+```mermaid
+classDiagram
+    class IProtocolAdapter {
+        <<interface>>
+        +explore(uri)
+        +act(uri, action, payload)
+        +create(uri, payload)
+        +connect()
+        +disconnect()
+    }
+    
+    class CognitiveBridge {
+        -store: CognitiveStore
+        -adapter: IProtocolAdapter
+        +constructor(store, adapter)
+        +explore(uri)
+        +act(uri, action, payload)
+        +create(uri, payload)
+    }
+    
+    class McpProtocolAdapter {
+        -store: CognitiveStore
+        -mcp: McpServer
+        -transport: McpServerTransport
+        +constructor(store, options)
+        +explore(uri)
+        +act(uri, action, payload)
+        +create(uri, payload)
+        +setTransport(transport)
+        -registerTools()
+    }
+    
+    class ProtocolFactory {
+        <<static>>
+        +createMcpAdapter(store, options)
+        +createAdapter(store, protocolType, options)
+    }
+    
+    class FutureAdapters {
+        <<abstract>>
+        OpenAIAdapter
+        AnthropicAdapter
+        GeminiAdapter
+        etc...
+    }
+    
+    CognitiveBridge --> IProtocolAdapter : uses
+    IProtocolAdapter <|.. McpProtocolAdapter : implements
+    IProtocolAdapter <|.. FutureAdapters : implements
+    ProtocolFactory ..> McpProtocolAdapter : creates
+    ProtocolFactory ..> FutureAdapters : creates
+```
+
+## Complete Architecture Flow
+
+```mermaid
+graph TD
+    subgraph "Client Layer"
+        Client[HTTP Client]
+        AIGENT[AI Agent]
+    end
+    
+    subgraph "Transport Layer"
+        HTTP[HTTP Transport]
+        Stdio[Stdio Transport]
+        SSE[SSE Transport]
+    end
+    
+    subgraph "Protocol Layer"
+        Bridge[CognitiveBridge]
+        ProtocolFactory[Protocol Factory]
+        MCP[McpProtocolAdapter]
+        OpenAI[OpenAI/Other Adapters]
+    end
+    
+    subgraph "Domain Layer"
+        Store[CognitiveStore]
+        Resource[CognitiveResource]
+        Collection[CognitiveCollection]
+        SM[StateMachine]
+    end
+    
+    subgraph "Storage Layer"
+        AdapterFactory[Storage Adapter Factory]
+        DenoKV[DenoKvAdapter]
+        Postgres[PostgresAdapter]
+        Other[Other Storage Adapters]
+    end
+    
+    Client --> HTTP
+    AIGENT --> Stdio
+    AIGENT --> SSE
+    
+    HTTP --> Bridge
+    Stdio --> Bridge
+    SSE --> Bridge
+    
+    Bridge -- uses --> MCP
+    Bridge -- uses --> OpenAI
+    ProtocolFactory -- creates --> MCP
+    ProtocolFactory -- creates --> OpenAI
+    
+    MCP -- calls --> Store
+    OpenAI -- calls --> Store
+    
+    Store -- uses --> SM
+    Store -- creates --> Resource
+    Store -- creates --> Collection
+    
+    Store -- uses adapter --> AdapterFactory
+    AdapterFactory -- creates --> DenoKV
+    AdapterFactory -- creates --> Postgres
+    AdapterFactory -- creates --> Other
 ``` 

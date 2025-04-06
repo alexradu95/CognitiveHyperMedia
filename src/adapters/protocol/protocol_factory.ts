@@ -1,4 +1,4 @@
-import { CognitiveStore } from "../store/store.ts";
+import { CognitiveStore } from "../../infrastracture/store/store.ts";
 import { IProtocolAdapter } from "./protocol_adapter.ts";
 import { McpProtocolAdapter, McpAdapterOptions } from "./mcp_adapter.ts";
 
