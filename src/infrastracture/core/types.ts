@@ -1,9 +1,43 @@
 /**
+ * 📚 Core types for the Cognitive Hypermedia framework
+ */
+
+/**
+ * 🏷️ Common resource type literals
+ */
+export type ResourceTypeLiteral = 'collection' | 'error' | string;
+
+/**
+ * 🏷️ Priority levels used throughout the framework
+ */
+export type PriorityLevel = 'high' | 'medium' | 'low';
+
+/**
+ * 🏷️ Parameter types for action parameters
+ */
+export type ParameterType = 'string' | 'number' | 'boolean' | 'object' | 'array';
+
+/**
+ * 🏷️ Relationship cardinality options
+ */
+export type Cardinality = 'one' | 'many';
+
+/**
+ * 🏷️ Progress indicator types
+ */
+export type ProgressIndicatorType = 'percentage' | 'fraction' | 'steps';
+
+/**
+ * 🏷️ Conversation prompt types
+ */
+export type PromptType = 'follow-up' | 'confirmation' | 'explanation' | 'suggestion';
+
+/**
  * 📚 Core structure for a Cognitive Hypermedia resource.
  */
 export interface CognitiveResource {
     _id: string;
-    _type: string;
+    _type: ResourceTypeLiteral;
     [propertyName: string]: unknown;
   
     _actions?: Record<string, Action>;
@@ -27,7 +61,7 @@ export interface Action {
  * 🛠️ Definition of a parameter for an action.
  */
 export interface ParameterDefinition {
-    type: "string" | "number" | "boolean" | "object" | "array";
+    type: ParameterType;
     description?: string;
     required?: boolean;
     default?: unknown;
@@ -73,7 +107,7 @@ export interface ParameterDefinition {
     type: string;
     id?: string;
     preview?: Record<string, unknown>; // Abbreviated representation
-    cardinality?: "one" | "many";
+    cardinality?: Cardinality;
     role?: string; // Describes the role of this resource in the relationship
   }
   
@@ -81,7 +115,7 @@ export interface ParameterDefinition {
    * 🎨 Guidance on how a resource should be visualized.
    */
   export interface PresentationHints {
-    priority?: "high" | "medium" | "low";
+    priority?: PriorityLevel;
     visualization?: string; // e.g., 'card', 'listItem', 'detailView'
     icon?: string; // e.g., 'task', 'document'
     color?: string; // e.g., 'blue', '#ff0000'
@@ -95,7 +129,7 @@ export interface ParameterDefinition {
    * 📊 Guidance for visualizing progress.
    */
   export interface ProgressIndicator {
-    type: "percentage" | "fraction" | "steps";
+    type: ProgressIndicatorType;
     value: number;
     max?: number;
     label?: string;
@@ -113,17 +147,17 @@ export interface ParameterDefinition {
    * 🗣️ Suggested prompt to guide conversation flow.
    */
   export interface ConversationPrompt {
-    type: "follow-up" | "confirmation" | "explanation" | "suggestion";
+    type: PromptType;
     text: string;
     condition?: string; // Optional condition (e.g., "when state.current == 'pending'")
-    priority?: "high" | "medium" | "low";
+    priority?: PriorityLevel;
   }
   
   /**
    * 📚 Structure for a collection of resources.
    */
   export interface CognitiveCollection extends CognitiveResource {
-    _type: "collection";
+    _type: 'collection';
     itemType: string; // The type of resource contained in the collection
     items: CognitiveResource[];
     pagination?: PaginationInfo;
@@ -145,7 +179,7 @@ export interface ParameterDefinition {
    * 🚨 Standard representation for errors.
    */
   export interface CognitiveError {
-    _type: "error";
+    _type: 'error';
     code: string; // Application-specific error code
     message: string; // Human-readable error message
     details?: Record<string, unknown>; // Additional error details
@@ -161,3 +195,30 @@ export interface ParameterDefinition {
     action: string; // Action ID
     parameters?: Record<string, unknown>;
   }
+
+/**
+ * 🧰 Type guard to check if a resource is a collection
+ */
+export function isCollection(resource: CognitiveResource): resource is CognitiveCollection {
+  return resource._type === 'collection';
+}
+
+/**
+ * 🧰 Type guard to check if an object is a cognitive error
+ */
+export function isError(obj: unknown): obj is CognitiveError {
+  return obj !== null && 
+         typeof obj === 'object' && 
+         '_type' in obj && 
+         (obj as { _type: string })._type === 'error';
+}
+
+/**
+ * 🧰 Helper to create a new empty resource with required fields
+ */
+export function createEmptyResource(id: string, type: string): CognitiveResource {
+  return {
+    _id: id,
+    _type: type
+  };
+}

@@ -8,8 +8,12 @@ import { Action } from "./resource.ts"; // Reuse Action definition if applicable
 export interface TransitionDefinition {
   /** The target state name after the action is performed. */
   target: string;
-  // TODO: Add guards/conditions for the transition later?
-  // TODO: Add effects/callbacks executed during transition later?
+  /** Description of the transition effect */
+  description?: string;
+  /** Optional guard condition that must be true for the transition */
+  guard?: (context: unknown) => boolean;
+  /** Optional effect function executed during transition */
+  effect?: (context: unknown) => void | Promise<void>;
 }
 
 /**
@@ -24,6 +28,10 @@ export interface StateDefinition {
   allowedActions: Record<string, Action>; // Map action name to its definition
   /** Transitions triggered by actions from this state. */
   transitions?: Record<string, TransitionDefinition>; // Map action name to transition
+  /** Optional function called when entering this state */
+  onEnter?: (context: unknown) => void | Promise<void>;
+  /** Optional function called when exiting this state */
+  onExit?: (context: unknown) => void | Promise<void>;
 }
 
 /**
@@ -40,7 +48,7 @@ export interface StateMachineDefinition {
  * ✨ Manages the states and transitions for a specific resource type based on a definition.
  */
 export class StateMachine {
-  private definition: StateMachineDefinition;
+  #definition: StateMachineDefinition;
 
   /**
    * ⚙️ Creates a new StateMachine instance.
@@ -48,7 +56,7 @@ export class StateMachine {
    */
   constructor(definition: StateMachineDefinition) {
     // TODO: Add validation for the definition (e.g., initial state exists, transitions point to valid states)
-    this.definition = definition;
+    this.#definition = definition;
   }
 
   /**
@@ -56,7 +64,7 @@ export class StateMachine {
    * @returns The initial state name.
    */
   getInitialState(): string {
-    return this.definition.initialState;
+    return this.#definition.initialState;
   }
 
   /**
@@ -65,7 +73,7 @@ export class StateMachine {
    * @returns The StateDefinition, or undefined if the state doesn't exist.
    */
   getStateDefinition(stateName: string): StateDefinition | undefined {
-    return this.definition.states[stateName];
+    return this.#definition.states[stateName];
   }
 
   /**
@@ -76,9 +84,7 @@ export class StateMachine {
    * @returns True if the action is allowed, false otherwise.
    */
   isActionAllowed(stateName: string, actionName: string): boolean {
-    const stateDef = this.getStateDefinition(stateName);
-    const isAllowed = !!stateDef?.allowedActions[actionName];
-    return isAllowed;
+    return Boolean(this.getStateDefinition(stateName)?.allowedActions[actionName]);
   }
 
   /**
@@ -88,8 +94,7 @@ export class StateMachine {
    * @returns The target state name if a transition occurs, otherwise undefined.
    */
   getTargetState(stateName: string, actionName: string): string | undefined {
-    const stateDef = this.getStateDefinition(stateName);
-    return stateDef?.transitions?.[actionName]?.target;
+    return this.getStateDefinition(stateName)?.transitions?.[actionName]?.target;
   }
 
   /**
@@ -98,7 +103,132 @@ export class StateMachine {
    * @returns A record mapping action names to their definitions for the specified state, or an empty object if the state is not found.
    */
   getAllowedActions(stateName: string): Record<string, Action> {
-    const stateDef = this.getStateDefinition(stateName);
-    return stateDef?.allowedActions ?? {};
+    return this.getStateDefinition(stateName)?.allowedActions ?? {};
+  }
+
+  /**
+   * 📝 Gets the description of a state
+   * @param stateName - The name of the state
+   * @returns The description of the state, or undefined if none exists
+   */
+  getStateDescription(stateName: string): string | undefined {
+    return this.getStateDefinition(stateName)?.description;
+  }
+
+  /**
+   * 📝 Gets the description of a transition
+   * @param stateName - The current state name
+   * @param actionName - The action name
+   * @returns The description of the transition, or undefined if none exists
+   */
+  getTransitionDescription(stateName: string, actionName: string): string | undefined {
+    return this.getStateDefinition(stateName)?.transitions?.[actionName]?.description;
+  }
+
+  /**
+   * 🧪 Checks if a transition from one state to another is valid
+   * @param fromState - The starting state
+   * @param toState - The target state
+   * @returns True if any action can transition from fromState to toState
+   */
+  canTransition(fromState: string, toState: string): boolean {
+    const stateDef = this.getStateDefinition(fromState);
+    if (!stateDef?.transitions) return false;
+    
+    return Object.values(stateDef.transitions)
+      .some(transition => transition.target === toState);
+  }
+}
+
+/**
+ * 🏗️ Builder for creating StateMachine instances with a fluent API
+ */
+export class StateMachineBuilder {
+  #initialState = '';
+  #states: Record<string, StateDefinition> = {};
+
+  /**
+   * 🏁 Sets the initial state of the state machine
+   */
+  initialState(name: string): StateMachineBuilder {
+    this.#initialState = name;
+    return this;
+  }
+
+  /**
+   * ➕ Adds a state to the state machine
+   */
+  addState(state: StateDefinition): StateMachineBuilder {
+    this.#states[state.name] = state;
+    return this;
+  }
+
+  /**
+   * ➕ Adds a state with the given name and properties
+   */
+  state(name: string, {
+    description,
+    allowedActions = {},
+    transitions = {},
+    onEnter,
+    onExit
+  }: Partial<Omit<StateDefinition, 'name'>> = {}): StateMachineBuilder {
+    this.#states[name] = {
+      name,
+      description,
+      allowedActions,
+      transitions,
+      onEnter,
+      onExit
+    };
+    return this;
+  }
+
+  /**
+   * ➡️ Adds a transition between states
+   */
+  transition(
+    fromState: string,
+    actionName: string,
+    toState: string,
+    options: Partial<Omit<TransitionDefinition, 'target'>> = {}
+  ): StateMachineBuilder {
+    // Create the from state if it doesn't exist
+    if (!this.#states[fromState]) {
+      this.state(fromState);
+    }
+
+    // Ensure transitions map exists
+    this.#states[fromState].transitions ??= {};
+    
+    // Add the transition
+    this.#states[fromState].transitions![actionName] = {
+      target: toState,
+      ...options
+    };
+    
+    return this;
+  }
+
+  /**
+   * 🔨 Builds and returns the StateMachine instance
+   */
+  build(): StateMachine {
+    if (!this.#initialState) {
+      throw new Error('Initial state must be set');
+    }
+    
+    if (Object.keys(this.#states).length === 0) {
+      throw new Error('At least one state must be defined');
+    }
+    
+    if (!this.#states[this.#initialState]) {
+      throw new Error(`Initial state "${this.#initialState}" is not defined`);
+    }
+    
+    return new StateMachine({
+      initialState: this.#initialState,
+      states: { ...this.#states }
+    });
   }
 } 
