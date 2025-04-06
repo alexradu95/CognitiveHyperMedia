@@ -43,4 +43,10 @@
     *   Unit tests for `StateMachine`.
     *   Unit tests for `McpBridge` handlers covering success and error cases.
 10. **Strict State Action Checking:**
-    *   `performAction` now strictly enforces that an action (including `update`/`delete`) must be present in the current state's `allowedActions` if a state machine is registered. 
+    *   `performAction` now strictly enforces that an action (including `update`/`delete`) must be present in the current state's `allowedActions` if a state machine is registered.
+11. **Storage Adapter Pattern:**
+    *   Defined `IStorageAdapter` interface in `src/store/storage_adapter.ts`
+    *   Refactored `CognitiveStore` to be storage-agnostic, accepting any adapter implementing the interface
+    *   Moved Deno KV implementation to `adapters/deno/kv_adapter.ts`
+    *   Updated tests to use the adapter pattern
+    *   Made the framework core independent of specific storage technologies 

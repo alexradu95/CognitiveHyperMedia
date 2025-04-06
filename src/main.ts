@@ -1,6 +1,7 @@
 import { CognitiveStore } from "./store/store.ts";
 import { createMcpBridge, McpBridge } from "./mcp/bridge.ts";
 import { StateMachineDefinition } from "./core/statemachine.ts";
+import { DenoKvAdapter } from "../adapters/deno/kv_adapter.ts";
 
 // --- Define or Import State Machines ---
 // TODO: Move this to a dedicated configuration/definition file
@@ -22,7 +23,8 @@ async function main() {
 
   // --- Initialize Dependencies ---
   const kv = await Deno.openKv(); // Use default persistent KV or specify path ":memory:"
-  const store = new CognitiveStore(kv);
+  const kvAdapter = new DenoKvAdapter(kv);
+  const store = new CognitiveStore(kvAdapter);
   const bridge = createMcpBridge(store);
 
   // --- Register State Machines ---

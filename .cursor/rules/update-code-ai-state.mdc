@@ -9,11 +9,11 @@ Description:
 
 After completing a significant step, implementing a feature, fixing a major bug, or changing the architecture, remember to **update the relevant files in the `@code_ai_state` directory**:
 
--   `@code_ai_state/IMPLEMENTED_FEATURES.md`: Add newly completed items.
--   `@code_ai_state/TODO_NEXT.md`: Update the list of immediate next steps.
--   `@code_ai_state/FIXMES.md`: Add or remove items that need fixing.
--   `@code_ai_state/FUTURE_IMPROVEMENTS.md`: Add any new ideas for the future.
--   `@code_ai_state/ARCHITECTURE.md`: Update diagrams if the structure has changed.
--   `@code_ai_state/TEST_COVERAGE_GAPS.md`: Add or remove identified gaps.
+-   `@docs/current_state/IMPLEMENTED_FEATURES.md`: Add newly completed items.
+-   `@docs/current_state/TODO_NEXT.md`: Update the list of immediate next steps.
+-   `@docs/current_state/FIXMES.md`: Add or remove items that need fixing.
+-   `@docs/current_state/FUTURE_IMPROVEMENTS.md`: Add any new ideas for the future.
+-   `@docs/current_state/ARCHITECTURE.md`: Update diagrams if the structure has changed.
+-   `@docs/current_state/TEST_COVERAGE_GAPS.md`: Add or remove identified gaps.
 
 This helps maintain an accurate overview of the project's status.

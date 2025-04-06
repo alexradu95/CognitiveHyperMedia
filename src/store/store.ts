@@ -9,6 +9,7 @@ import {
 } from "../core/resource.ts";
 import { CognitiveCollection, PaginationInfo } from "../core/collection.ts";
 import { StateMachine, StateMachineDefinition } from "../core/statemachine.ts"; // Uncommented
+import { IStorageAdapter } from "./storage_adapter.ts";
 
 /**
  * 💾 Provides persistence and retrieval logic for Cognitive Resources using Deno KV.
@@ -16,15 +17,15 @@ import { StateMachine, StateMachineDefinition } from "../core/statemachine.ts"; 
  * Based on Section 6.3 of the white paper.
  */
 export class CognitiveStore {
-  private kv: Deno.Kv;
+  private storage: IStorageAdapter;
   private stateMachines: Map<string, StateMachine>; // Use the imported StateMachine type
 
   /**
    * ⚙️ Creates a new CognitiveStore instance.
-   * @param kv - An initialized Deno KV instance for storage.
+   * @param storage - A storage adapter instance implementing IStorageAdapter.
    */
-  constructor(kv: Deno.Kv) {
-    this.kv = kv;
+  constructor(storage: IStorageAdapter) {
+    this.storage = storage;
     this.stateMachines = new Map(); // Initialize the map
   }
 
@@ -44,7 +45,7 @@ export class CognitiveStore {
   }
 
   /**
-   * ➕ Creates a new resource in the KV store.
+   * ➕ Creates a new resource using the storage adapter.
    * @param type - The type of the resource to create.
    * @param data - The initial data for the resource properties.
    *               If data.id is provided, it will be used; otherwise, a UUID is generated.
@@ -56,7 +57,6 @@ export class CognitiveStore {
     data: Record<string, unknown>
   ): Promise<CognitiveResource> {
     const id = (data.id as string) || crypto.randomUUID();
-    const key = [type, id];
 
     // Initialize resource data, merging input data
     const resourceData: Record<string, unknown> = { ...data };
@@ -72,11 +72,8 @@ export class CognitiveStore {
       resourceData.status = sm.getInitialState(); // Use 'status' property for state
     }
 
-    // Store in KV
-    const commitResult = await this.kv.set(key, resourceData);
-    if (!commitResult.ok) {
-      throw new Error(`Failed to commit resource ${type}/${id} to KV store.`);
-    }
+    // Store using the adapter
+    await this.storage.create(type, id, resourceData);
 
     // Create the resource instance
     // TODO: Handle different resource types (e.g., instantiate CognitiveCollection if type is collection?)
@@ -99,10 +96,9 @@ export class CognitiveStore {
    * @returns A promise resolving to the enhanced CognitiveResource, or null if not found.
    */
   async get(type: string, id: string): Promise<CognitiveResource | null> {
-    const key = [type, id];
-    const result = await this.kv.get<Record<string, unknown>>(key);
+    const result = await this.storage.get(type, id);
 
-    if (!result.value) {
+    if (!result) {
       return null; // Resource not found
     }
 
@@ -110,7 +106,7 @@ export class CognitiveStore {
     const resource = new CognitiveResource({
       id: id, // Use the requested ID
       type: type, // Use the requested type
-      properties: result.value, // Use the data retrieved from KV
+      properties: result, // Use the data retrieved from storage
     });
 
     // Enhance with actions, state info, relationships, etc.
@@ -120,7 +116,7 @@ export class CognitiveStore {
   }
 
   /**
-   * 🔄 Updates an existing resource in the KV store.
+   * 🔄 Updates an existing resource in the storage.
    * Merges existing data with the provided updates and sets a new updatedAt timestamp.
    * @param type - The type of the resource.
    * @param id - The ID of the resource to update.
@@ -133,11 +129,9 @@ export class CognitiveStore {
     id: string,
     updates: Record<string, unknown>
   ): Promise<CognitiveResource> {
-    const key = [type, id];
-
     // 1. Get existing data
-    const existingResult = await this.kv.get<Record<string, unknown>>(key);
-    if (!existingResult.value) {
+    const existingData = await this.storage.get(type, id);
+    if (!existingData) {
       throw new Error(`Resource ${type}/${id} not found for update.`);
     }
 
@@ -145,10 +139,10 @@ export class CognitiveStore {
     // Make sure not to overwrite the original 'id' or 'createdAt' from updates
     const { id: _, createdAt: __, ...safeUpdates } = updates;
     const updatedData = {
-      ...existingResult.value,
+      ...existingData,
       ...safeUpdates, // Apply safe updates over existing data
       id: id, // Ensure original ID is kept
-      createdAt: existingResult.value.createdAt, // Ensure original createdAt is kept
+      createdAt: existingData.createdAt, // Ensure original createdAt is kept
       updatedAt: new Date().toISOString(), // Set new timestamp
     };
 
@@ -160,11 +154,8 @@ export class CognitiveStore {
     // TODO (Future): Handle state transitions if updates include state changes & machine exists
     // if (updates.status && this.stateMachines.has(type)) { ... }
 
-    // 3. Update in KV store
-    const commitResult = await this.kv.set(key, updatedData);
-    if (!commitResult.ok) {
-      throw new Error(`Failed to commit update for resource ${type}/${id} to KV store.`);
-    }
+    // 3. Update in storage
+    await this.storage.update(type, id, updatedData);
 
     // 4. Create and enhance the updated resource instance
     const resource = new CognitiveResource({
@@ -179,19 +170,15 @@ export class CognitiveStore {
   }
 
   /**
-   * ❌ Deletes a resource from the KV store.
+   * ❌ Deletes a resource from the storage.
    * Fails gracefully if the resource doesn't exist.
    * @param type - The type of the resource to delete.
    * @param id - The ID of the resource to delete.
    * @returns A promise that resolves when the deletion attempt is complete.
    */
   async delete(type: string, id: string): Promise<void> {
-    const key = [type, id];
-    // Deno KV delete is idempotent, so no need to check existence first.
-    await this.kv.delete(key);
+    await this.storage.delete(type, id);
   }
-
-  // --- Placeholder Methods for Future Batches ---
 
   /**
    * 📚 Retrieves a collection of resources, supporting filtering and pagination.
@@ -205,40 +192,16 @@ export class CognitiveStore {
   ): Promise<CognitiveCollection> {
     const { filter = {}, page = 1, pageSize = 10 } = options; // Default page size 10
 
-    // Build prefix for listing
-    const prefix = [type];
-
-    // 1. List and filter resources from KV
-    const entries = this.kv.list<Record<string, unknown>>({ prefix });
-    const filteredItemsData: Array<[string, Record<string, unknown>]> = [];
-
-    for await (const entry of entries) {
-      const id = entry.key[entry.key.length - 1] as string;
-      const data = entry.value;
-
-      // Apply filters (simple equality check for now)
-      if (this.matchesFilter(data, filter)) {
-        filteredItemsData.push([id, data]);
-      }
-    }
-
-    // 2. Sort filtered items (e.g., by creation date) for consistent pagination
-    filteredItemsData.sort(([, aData], [, bData]) => {
-      // Sort ascending by createdAt timestamp
-      const dateA = aData.createdAt ? new Date(aData.createdAt as string).getTime() : 0;
-      const dateB = bData.createdAt ? new Date(bData.createdAt as string).getTime() : 0;
-      return dateA - dateB;
+    // Use storage adapter to list items
+    const result = await this.storage.list(type, {
+      filter,
+      page,
+      pageSize,
     });
 
-    // 3. Apply pagination to the *sorted* list
-    const totalItems = filteredItemsData.length;
-    const totalPages = Math.ceil(totalItems / pageSize);
-    const startIndex = (page - 1) * pageSize;
-    const paginatedItemsData = filteredItemsData.slice(startIndex, startIndex + pageSize);
-
-    // 4. Create and enhance resource instances for the current page
     const items: CognitiveResource[] = [];
-    for (const [id, data] of paginatedItemsData) {
+    for (const data of result.items) {
+      const id = data.id as string;
       const resource = new CognitiveResource({
         id,
         type,
@@ -248,47 +211,33 @@ export class CognitiveStore {
       items.push(resource);
     }
 
-    // 5. Create the collection instance
+    // Create a collection resource with metadata and pagination
     const collection = new CognitiveCollection({
-      id: `${type}-collection-${page}`, // Example dynamic ID
+      id: crypto.randomUUID(),
       itemType: type,
-      items: items,
+      items,
     });
 
-    // 6. Set pagination info
+    // Set pagination info
     collection.setPagination({
       page,
       pageSize,
-      totalItems,
-      totalPages,
+      totalItems: result.totalItems,
+      totalPages: Math.ceil(result.totalItems / pageSize),
     });
 
-    // 7. Set applied filters if any were used
+    // Set filters if any were applied
     if (Object.keys(filter).length > 0) {
       collection.setFilters(filter);
     }
 
-    // 8. Add default collection-level actions
-    collection.addAction("create", {
-      description: `Create a new ${type}`,
-      // parameters: this.getCreateParameters(type) // TODO
-    });
-    collection.addAction("filter", {
-      description: `Filter ${type} collection`,
-      // parameters: this.getFilterParameters(type) // TODO
-    });
-
-    // TODO (Future): Add collection-level presentation hints
-
-    // TODO (Future): Add collection-level prompts
-    // collection.addPrompt({ ... });
-
-    // TODO (Future): Add aggregates if applicable
-    // const aggregates = await this.calculateAggregates(type, filteredItemsData);
-    // if (Object.keys(aggregates).length > 0) { collection.setAggregates(aggregates); }
+    // 6. Enhance the collection with collection-level actions
+    this.enhanceCollectionWithActions(collection, type);
 
     return collection;
   }
+
+  // --- Placeholder Methods for Future Batches ---
 
   /**
    * 🛠️ Executes a defined action on a specific resource.
@@ -374,19 +323,14 @@ export class CognitiveStore {
           // For now, let's risk the re-enhance, assuming it's idempotent for status.
 
           // Directly update the status in KV to avoid calling update() again
-          const currentData = (await this.kv.get<Record<string, unknown>>([type, id])).value;
+          const currentData = (await this.storage.get(type, id)) as Record<string, unknown>;
           if (currentData) {
             const newData = {
               ...currentData,
               status: finalState,
               updatedAt: new Date().toISOString(), // Also update timestamp on state change
             };
-            const commitResult = await this.kv.set([type, id], newData);
-            if (!commitResult.ok) {
-                console.error(`KV commit failed when updating status for ${type}/${id}`);
-                // Decide how to handle commit failure - throw? log?
-                // For now, log and continue, the in-memory resource status *is* updated.
-            }
+            await this.storage.update(type, id, newData);
             console.log(`Transitioned ${type}/${id} from ${currentState} to ${finalState}`);
             // Update the in-memory resource object as well
             resultResource.setProperty("status", finalState);
@@ -395,7 +339,7 @@ export class CognitiveStore {
             // Since enhanceResource reads status, let's re-enhance for consistency
             this.enhanceResource(resultResource); // Re-enhance with the new state
           } else {
-              console.warn(`Could not find resource ${type}/${id} in KV for status update after action.`);
+              console.warn(`Could not find resource ${type}/${id} in storage for status update after action.`);
               // This shouldn't happen if updateRequired=true and resultResource exists
           }
         }
@@ -404,10 +348,6 @@ export class CognitiveStore {
 
     return resultResource;
   }
-
-  // async update(type: string, id: string, data: Record<string, unknown>): Promise<CognitiveResource> { /* ... */ }
-  // async delete(type: string, id: string): Promise<void> { /* ... */ }
-  // async performAction(type: string, id: string, action: string, parameters?: Record<string, unknown>): Promise<CognitiveResource> { /* ... */ }
 
   // --- Private Helper Methods ---
 
@@ -601,6 +541,32 @@ export class CognitiveStore {
       }
     }
     return true;
+  }
+
+  /**
+   * 🔧 Enhances a collection with standard collection-level actions.
+   * @param collection - The collection to enhance.
+   * @param itemType - The type of items in the collection.
+   */
+  private enhanceCollectionWithActions(collection: CognitiveCollection, itemType: string): void {
+    // Add default collection-level actions
+    collection.addAction("create", {
+      description: `Create a new ${itemType}`,
+      // parameters: this.getCreateParameters(itemType) // TODO
+    });
+    collection.addAction("filter", {
+      description: `Filter ${itemType} collection`,
+      // parameters: this.getFilterParameters(itemType) // TODO
+    });
+
+    // TODO (Future): Add collection-level presentation hints
+
+    // TODO (Future): Add collection-level prompts
+    // collection.addPrompt({ ... });
+
+    // TODO (Future): Add aggregates if applicable
+    // const aggregates = await this.calculateAggregates(itemType, filteredItemsData);
+    // if (Object.keys(aggregates).length > 0) { collection.setAggregates(aggregates); }
   }
 }
 

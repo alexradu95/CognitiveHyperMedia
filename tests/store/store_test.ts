@@ -4,15 +4,17 @@ import {
   assertExists,
   assertNotEquals,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { CognitiveStore } from "../../src/store/store.ts"; // Will fail initially
+import { CognitiveStore } from "../../src/store/store.ts";
 import { CognitiveResource } from "../../src/core/resource.ts";
 import { CognitiveCollection, PaginationInfo } from "../../src/core/collection.ts";
-import { StateMachineDefinition } from "../../src/core/statemachine.ts"; // Import SM definition type
+import { StateMachineDefinition } from "../../src/core/statemachine.ts";
+import { DenoKvAdapter } from "../../adapters/deno/kv_adapter.ts";
 
 Deno.test("CognitiveStore - Resource Creation", async () => {
   // Use in-memory KV for testing
   const kv = await Deno.openKv(":memory:");
-  const store = new CognitiveStore(kv);
+  const adapter = new DenoKvAdapter(kv);
+  const store = new CognitiveStore(adapter);
 
   const resourceData = {
     title: "Test Note",
@@ -77,7 +79,8 @@ Deno.test("CognitiveStore - Resource Creation", async () => {
 
 Deno.test("CognitiveStore - Resource Retrieval (get)", async () => {
   const kv = await Deno.openKv(":memory:");
-  const store = new CognitiveStore(kv);
+  const adapter = new DenoKvAdapter(kv);
+  const store = new CognitiveStore(adapter);
 
   // 1. Create a resource first
   const initialData = { title: "Gettable Note", value: 123 };
@@ -215,7 +218,8 @@ Deno.test("CognitiveStore - Resource Retrieval (get)", async () => {
 
 Deno.test("CognitiveStore - Resource Update (update)", async () => {
   const kv = await Deno.openKv(":memory:");
-  const store = new CognitiveStore(kv);
+  const adapter = new DenoKvAdapter(kv);
+  const store = new CognitiveStore(adapter);
 
   // 1. Create a resource
   const initialData = { name: "Initial Name", version: 1 };
@@ -295,7 +299,8 @@ Deno.test("CognitiveStore - Resource Update (update)", async () => {
 
 Deno.test("CognitiveStore - Resource Deletion (delete)", async () => {
   const kv = await Deno.openKv(":memory:");
-  const store = new CognitiveStore(kv);
+  const adapter = new DenoKvAdapter(kv);
+  const store = new CognitiveStore(adapter);
 
   // 1. Create a resource
   const created = await store.create("deletable", { data: "to be deleted" });
@@ -332,7 +337,8 @@ Deno.test("CognitiveStore - Resource Deletion (delete)", async () => {
 
 Deno.test("CognitiveStore - Collection Retrieval (getCollection)", async () => {
   const kv = await Deno.openKv(":memory:");
-  const store = new CognitiveStore(kv);
+  const adapter = new DenoKvAdapter(kv);
+  const store = new CognitiveStore(adapter);
   const TYPE = "widget";
 
   // 1. Create multiple resources of the same type
@@ -388,7 +394,8 @@ Deno.test("CognitiveStore - Collection Retrieval (getCollection)", async () => {
   // 5. Test Pagination (assuming default pageSize is < 3, e.g., 2 for test)
   // Re-create store or use different type for clean pagination test
   const kv2 = await Deno.openKv(":memory:");
-  const store2 = new CognitiveStore(kv2);
+  const adapter2 = new DenoKvAdapter(kv2);
+  const store2 = new CognitiveStore(adapter2);
   const PTYPE = "pageItem";
   const p1 = await store2.create(PTYPE, { name: "P1" });
   await new Promise(resolve => setTimeout(resolve, 10)); // Add small delay
@@ -446,7 +453,8 @@ Deno.test("CognitiveStore - Collection Retrieval (getCollection)", async () => {
 
 Deno.test("CognitiveStore - Action Execution (performAction)", async () => {
   const kv = await Deno.openKv(":memory:");
-  const store = new CognitiveStore(kv);
+  const adapter = new DenoKvAdapter(kv);
+  const store = new CognitiveStore(adapter);
   const TYPE = "actionable";
 
   // 1. Test performing default 'update' action
