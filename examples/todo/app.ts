@@ -14,6 +14,11 @@ import { McpServer, ResourceTemplate } from "npm:@modelcontextprotocol/sdk/serve
 import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+// Redirect stdout to stderr for third-party libraries
+// This prevents any text from interfering with MCP protocol messages
+const originalConsoleLog = console.log;
+console.log = (...args) => console.error(...args);
+
 // Todo App specific state machine definition
 const taskStateMachineDefinition: StateMachineDefinition = {
   initialState: "pending",
@@ -49,12 +54,15 @@ async function setupMcpServer(store: CognitiveStore) {
     }
   );
 
-  // Get task by ID
+  // Get task by ID - Fix the ResourceTemplate syntax
+  const taskTemplate = new ResourceTemplate("task://{id}", { list: undefined });
   server.resource(
     "task",
-    new ResourceTemplate("task://{id}", { list: undefined }),
-    async (uri: URL, { id }: { id: string }) => {
-      const task = await store.get("task", id);
+    taskTemplate,
+    async (uri: URL, variables) => {
+      // Ensure we have a string ID by converting if needed
+      const taskId = String(variables.id);
+      const task = await store.get("task", taskId);
       return {
         contents: [{
           uri: uri.href,
@@ -115,11 +123,292 @@ async function setupMcpServer(store: CognitiveStore) {
     }
   );
 
+  // ✅ NEW TOOL: Delete task
+  server.tool(
+    "delete-task",
+    { id: z.string() },
+    async ({ id }) => {
+      try {
+        await store.delete("task", id);
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Task ${id} deleted successfully` 
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Error deleting task: ${error instanceof Error ? error.message : String(error)}` 
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // ✅ NEW TOOL: Update task details
+  server.tool(
+    "update-task",
+    { 
+      id: z.string(), 
+      title: z.string().optional(), 
+      description: z.string().optional() 
+    },
+    async ({ id, title, description }) => {
+      try {
+        const task = await store.get("task", id);
+        if (!task) {
+          return {
+            content: [{ type: "text", text: `Task ${id} not found` }],
+            isError: true
+          };
+        }
+
+        // Only update specified fields
+        if (title !== undefined) {
+          task.setProperty("title", title);
+        }
+        if (description !== undefined) {
+          task.setProperty("description", description);
+        }
+
+        // Convert CognitiveResource to plain object for update
+        const taskData = task.toJSON();
+        await store.update("task", id, taskData);
+
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Task ${id} updated successfully` 
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Error updating task: ${error instanceof Error ? error.message : String(error)}` 
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // ✅ NEW TOOL: List tasks with filtering
+  server.tool(
+    "list-tasks",
+    { 
+      state: z.string().optional(),
+      limit: z.number().optional()
+    },
+    async ({ state, limit = 10 }) => {
+      try {
+        const options: Record<string, unknown> = { 
+          pageSize: limit 
+        };
+        
+        // Add state filter if provided
+        if (state) {
+          options.filter = { state };
+        }
+        
+        const tasks = await store.getCollection("task", options);
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: JSON.stringify(tasks.toJSON(), null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Error listing tasks: ${error instanceof Error ? error.message : String(error)}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // ✅ NEW TOOL: Get task details
+  server.tool(
+    "get-task",
+    { id: z.string() },
+    async ({ id }) => {
+      try {
+        const task = await store.get("task", id);
+        
+        if (!task) {
+          return {
+            content: [{ type: "text", text: `Task ${id} not found` }],
+            isError: true
+          };
+        }
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: JSON.stringify(task.toJSON(), null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Error getting task: ${error instanceof Error ? error.message : String(error)}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // ✅ NEW TOOL: Search tasks by keywords
+  server.tool(
+    "search-tasks",
+    { query: z.string() },
+    async ({ query }) => {
+      try {
+        // Get all tasks first
+        const allTasks = await store.getCollection("task");
+        const tasksData = allTasks.toJSON();
+        
+        // Simple search through title and description
+        const taskItems = Array.isArray(tasksData.items) ? tasksData.items : [];
+        const results = taskItems.filter((task: any) => {
+          const title = String(task.title || '').toLowerCase();
+          const description = String(task.description || '').toLowerCase();
+          const searchQuery = query.toLowerCase();
+          
+          return title.includes(searchQuery) || description.includes(searchQuery);
+        });
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: JSON.stringify({ items: results, count: results.length }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Error searching tasks: ${error instanceof Error ? error.message : String(error)}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // ✅ NEW TOOL: Get available actions for a task
+  server.tool(
+    "get-task-actions",
+    { id: z.string() },
+    async ({ id }) => {
+      try {
+        const task = await store.get("task", id);
+        
+        if (!task) {
+          return {
+            content: [{ type: "text", text: `Task ${id} not found` }],
+            isError: true
+          };
+        }
+        
+        const currentState = task.getProperty("state") as string;
+        // Get state machine definition from task's metadata
+        const stateMachine = taskStateMachineDefinition;
+        
+        if (!stateMachine || !stateMachine.states[currentState]) {
+          return {
+            content: [{ type: "text", text: `Invalid state machine or state: ${currentState}` }],
+            isError: true
+          };
+        }
+        
+        const availableActions = stateMachine.states[currentState].allowedActions;
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: JSON.stringify(availableActions, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Error getting available actions: ${error instanceof Error ? error.message : String(error)}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // ✅ NEW TOOL: Get possible state transitions
+  server.tool(
+    "get-state-transitions",
+    { state: z.string() },
+    async ({ state }) => {
+      try {
+        // Get state machine definition directly
+        const stateMachine = taskStateMachineDefinition;
+        
+        if (!stateMachine || !stateMachine.states[state]) {
+          return {
+            content: [{ type: "text", text: `Invalid state: ${state}` }],
+            isError: true
+          };
+        }
+        
+        const stateInfo = stateMachine.states[state];
+        const transitions = stateInfo.transitions || {};
+        
+        // Format transitions for nicer display
+        const formattedTransitions = Object.entries(transitions).map(([action, targetInfo]) => {
+          const target = targetInfo as { target: string };
+          return {
+            action,
+            targetState: target.target,
+            targetDescription: stateMachine.states[target.target]?.description || ''
+          };
+        });
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: JSON.stringify({
+              currentState: state,
+              stateDescription: stateInfo.description,
+              possibleTransitions: formattedTransitions
+            }, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Error getting state transitions: ${error instanceof Error ? error.message : String(error)}`
+          }],
+          isError: true
+        };
+      }
+    }
+  );
+
+  // Don't log to stdout as it interferes with MCP protocol
+  console.error("✅ MCP server connecting via stdio transport.");
+  
   // Start receiving messages via stdio transport
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.log("✅ MCP server connected via stdio transport.");
-
+  
   return server;
 }
 
@@ -131,7 +420,7 @@ async function startHttpServer(store: CognitiveStore) {
   });
   
   const bridge = createBridge(store, adapter);
-  console.log("✅ HTTP bridge created.");
+  console.error("✅ HTTP bridge created.");
 
   // --- Define HTTP Request Handler ---
   const handler = async (req: Request): Promise<Response> => {
@@ -140,7 +429,7 @@ async function startHttpServer(store: CognitiveStore) {
     const method = req.method;
     let mcpResponse: { status: number; headers?: Record<string, string>; body?: any; } | null = null;
 
-    console.log(`➡️ ${method} ${url.pathname}${url.search}`);
+    console.error(`➡️ ${method} ${url.pathname}${url.search}`);
 
     try {
       let payload: Record<string, unknown> | undefined;
@@ -149,7 +438,7 @@ async function startHttpServer(store: CognitiveStore) {
             payload = await req.json();
          } catch (e) {
            const errorMsg = e instanceof Error ? e.message : String(e);
-           console.warn("Could not parse request body as JSON:", errorMsg);
+           console.error("Could not parse request body as JSON:", errorMsg);
            payload = undefined; // Treat as empty payload if parsing fails
          }
       }
@@ -196,7 +485,7 @@ async function startHttpServer(store: CognitiveStore) {
         }
     }
 
-    console.log(`⬅️ ${mcpResponse?.status || 500}`);
+    console.error(`⬅️ ${mcpResponse?.status || 500}`);
 
     return new Response(
         mcpResponse?.body ? JSON.stringify(mcpResponse.body, null, 2) : null, // Pretty print body
@@ -209,12 +498,12 @@ async function startHttpServer(store: CognitiveStore) {
 
   // --- Start Server ---
   const port = 8000;
-  console.log(`👂 Listening on http://localhost:${port}`);
+  console.error(`👂 Listening on http://localhost:${port}`);
   Deno.serve({ port, handler });
 }
 
 async function main() {
-  console.log("🚀 Starting Todo App...");
+  console.error("🚀 Starting Todo App...");
 
   // --- Initialize Dependencies ---
   let kv;
@@ -223,16 +512,24 @@ async function main() {
     kv = await Deno.openKv(); 
   } catch (error: unknown) {
     console.error("Error initializing KV:", error instanceof Error ? error.message : String(error));
-    console.log("Please make sure you're using the latest Deno version and running with --unstable-kv flag");
-    console.log("If problems persist, check the Deno KV documentation for API changes");
-    Deno.exit(1);
+    
+    // Try alternative approach for older Deno versions
+    try {
+      // @ts-ignore - For backward compatibility with older Deno versions
+      kv = await Deno.openKv?.() || Deno.openKv();
+    } catch {
+      console.error("Could not initialize Deno KV with any method.");
+      console.error("Please make sure you're using Deno v1.35+ and running with --unstable-kv flag");
+      console.error("Command: deno run --allow-net --allow-read --allow-write --unstable-kv examples/todo/app.ts");
+      Deno.exit(1);
+    }
   }
   const kvAdapter = new DenoKvAdapter(kv);
   const store = new CognitiveStore(kvAdapter);
   
   // --- Register State Machines ---
   store.registerStateMachine("task", taskStateMachineDefinition);
-  console.log("✅ State machines registered.");
+  console.error("✅ State machines registered.");
 
   // Determine which server type to start based on environment variable
   const serverType = Deno.env.get("SERVER_TYPE") || "mcp";
@@ -248,7 +545,7 @@ async function main() {
 // Run the main function
 if (import.meta.main) {
   main().catch((err) => {
-    console.error("💥 Server failed to start:", err);
+    console.error("🚨 Fatal error:", err);
     Deno.exit(1);
   });
 } 
