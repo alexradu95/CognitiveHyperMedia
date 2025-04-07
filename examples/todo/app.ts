@@ -80,16 +80,19 @@ async function setupMcpServer(store: CognitiveStore) {
       const newTask = {
         title,
         description: description || "",
-        state: "pending",
+        status: "pending", 
         createdAt: new Date().toISOString()
       };
       
       const id = await store.create("task", newTask);
       
+      // Ensure the ID is a string
+      const taskId = typeof id === 'object' ? JSON.stringify(id) : String(id);
+      
       return {
         content: [{ 
           type: "text", 
-          text: `Task created with ID: ${id}` 
+          text: `Task created with ID: ${taskId}` 
         }]
       };
     }
@@ -166,17 +169,19 @@ async function setupMcpServer(store: CognitiveStore) {
           };
         }
 
+        // Create update object with only the fields that need to be updated
+        const updates: Record<string, any> = {};
+        
         // Only update specified fields
         if (title !== undefined) {
-          task.setProperty("title", title);
+          updates.title = title;
         }
         if (description !== undefined) {
-          task.setProperty("description", description);
+          updates.description = description;
         }
 
-        // Convert CognitiveResource to plain object for update
-        const taskData = task.toJSON();
-        await store.update("task", id, taskData);
+        // Update the task directly with the updates object
+        await store.update("task", id, updates);
 
         return {
           content: [{ 
@@ -280,10 +285,29 @@ async function setupMcpServer(store: CognitiveStore) {
         // Simple search through title and description
         const taskItems = Array.isArray(tasksData.items) ? tasksData.items : [];
         const results = taskItems.filter((task: any) => {
-          const title = String(task.title || '').toLowerCase();
-          const description = String(task.description || '').toLowerCase();
-          const searchQuery = query.toLowerCase();
+          // Ensure we're looking at the correct properties, accounting for possible nesting
+          let title = '';
+          let description = '';
           
+          // Check if title/description are directly on the task
+          if (typeof task.title === 'string') {
+            title = task.title.toLowerCase();
+          }
+          if (typeof task.description === 'string') {
+            description = task.description.toLowerCase();
+          }
+          
+          // Check if they're in task.properties
+          if (task.properties) {
+            if (typeof task.properties.title === 'string') {
+              title = task.properties.title.toLowerCase();
+            }
+            if (typeof task.properties.description === 'string') {
+              description = task.properties.description.toLowerCase();
+            }
+          }
+          
+          const searchQuery = query.toLowerCase();
           return title.includes(searchQuery) || description.includes(searchQuery);
         });
         
@@ -320,7 +344,8 @@ async function setupMcpServer(store: CognitiveStore) {
           };
         }
         
-        const currentState = task.getProperty("state") as string;
+        // Change from "state" to "status" to match what performAction uses
+        const currentState = task.getProperty("status") as string || task.getProperty("state") as string;
         // Get state machine definition from task's metadata
         const stateMachine = taskStateMachineDefinition;
         
