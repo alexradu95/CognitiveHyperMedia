@@ -4,15 +4,15 @@ import { assertExists } from "https://deno.land/std@0.224.0/assert/assert_exists
 import { assertNotEquals } from "https://deno.land/std@0.224.0/assert/assert_not_equals.ts";
 import { StateMachineDefinition } from "../../src/infrastracture/core/statemachine.ts";
 import { CognitiveStore } from "../../src/infrastracture/store/store.ts";
-import { DenoKvAdapter } from "../../src/adapters/storage/deno/kv_adapter.ts";
+import { DenoKvStorage } from "../../src/infrastracture/storage/deno/kv_storage.ts";
 import { CognitiveResource } from "../../src/infrastracture/core/resource.ts";
 import { CognitiveCollection, PaginationInfo } from "../../src/infrastracture/core/collection.ts";
 
 Deno.test("CognitiveStore - Resource Creation", async () => {
   // Use in-memory KV for testing
   const kv = await Deno.openKv(":memory:");
-  const adapter = new DenoKvAdapter(kv);
-  const store = new CognitiveStore(adapter);
+  const storage = new DenoKvStorage(kv);
+  const store = new CognitiveStore(storage);
 
   const resourceData = {
     title: "Test Note",
@@ -77,8 +77,8 @@ Deno.test("CognitiveStore - Resource Creation", async () => {
 
 Deno.test("CognitiveStore - Resource Retrieval (get)", async () => {
   const kv = await Deno.openKv(":memory:");
-  const adapter = new DenoKvAdapter(kv);
-  const store = new CognitiveStore(adapter);
+  const storage = new DenoKvStorage(kv);
+  const store = new CognitiveStore(storage);
 
   // 1. Create a resource first
   const initialData = { title: "Gettable Note", value: 123 };
@@ -209,8 +209,8 @@ Deno.test("CognitiveStore - Resource Retrieval (get)", async () => {
 
 Deno.test("CognitiveStore - Resource Update (update)", async () => {
   const kv = await Deno.openKv(":memory:");
-  const adapter = new DenoKvAdapter(kv);
-  const store = new CognitiveStore(adapter);
+  const storage = new DenoKvStorage(kv);
+  const store = new CognitiveStore(storage);
 
   // 1. Create a resource
   const initialData = { name: "Initial Name", version: 1 };
@@ -290,8 +290,8 @@ Deno.test("CognitiveStore - Resource Update (update)", async () => {
 
 Deno.test("CognitiveStore - Resource Deletion (delete)", async () => {
   const kv = await Deno.openKv(":memory:");
-  const adapter = new DenoKvAdapter(kv);
-  const store = new CognitiveStore(adapter);
+  const storage = new DenoKvStorage(kv);
+  const store = new CognitiveStore(storage);
 
   // 1. Create a resource
   const created = await store.create("deletable", { data: "to be deleted" });
@@ -328,8 +328,8 @@ Deno.test("CognitiveStore - Resource Deletion (delete)", async () => {
 
 Deno.test("CognitiveStore - Collection Retrieval (getCollection)", async () => {
   const kv = await Deno.openKv(":memory:");
-  const adapter = new DenoKvAdapter(kv);
-  const store = new CognitiveStore(adapter);
+  const storage = new DenoKvStorage(kv);
+  const store = new CognitiveStore(storage);
   const TYPE = "widget";
 
   // 1. Create multiple resources of the same type
@@ -385,8 +385,8 @@ Deno.test("CognitiveStore - Collection Retrieval (getCollection)", async () => {
   // 5. Test Pagination (assuming default pageSize is < 3, e.g., 2 for test)
   // Re-create store or use different type for clean pagination test
   const kv2 = await Deno.openKv(":memory:");
-  const adapter2 = new DenoKvAdapter(kv2);
-  const store2 = new CognitiveStore(adapter2);
+  const storage2 = new DenoKvStorage(kv2);
+  const store2 = new CognitiveStore(storage2);
   const PTYPE = "pageItem";
   const p1 = await store2.create(PTYPE, { name: "P1" });
   await new Promise(resolve => setTimeout(resolve, 10)); // Add small delay
@@ -444,8 +444,8 @@ Deno.test("CognitiveStore - Collection Retrieval (getCollection)", async () => {
 
 Deno.test("CognitiveStore - Action Execution (performAction)", async () => {
   const kv = await Deno.openKv(":memory:");
-  const adapter = new DenoKvAdapter(kv);
-  const store = new CognitiveStore(adapter);
+  const storage = new DenoKvStorage(kv);
+  const store = new CognitiveStore(storage);
   const TYPE = "actionable";
 
   // 1. Test performing default 'update' action

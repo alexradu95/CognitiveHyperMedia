@@ -4,7 +4,9 @@ import { assert } from "https://deno.land/std@0.224.0/assert/assert.ts";
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/assert_equals.ts";
 import { assertExists } from "https://deno.land/std@0.224.0/assert/assert_exists.ts";
 import { StateMachineDefinition } from "../../src/infrastracture/core/statemachine.ts";
-import { CognitiveStore, ProtocolFactory, createBridge } from "../../mod.ts";
+import { CognitiveStore } from "../../src/infrastracture/store/store.ts";
+import { ProtocolFactory } from "../../src/infrastracture/protocol/protocol_factory.ts";
+import { createBridge } from "../../src/infrastracture/protocol/bridge.ts";
 import { MockTransport } from "./mock_transport.ts";
 
 
@@ -124,12 +126,12 @@ async function setupTestEnvironment() {
   store.registerStateMachine("task", taskStateMachineDefinition);
   
   const mockTransport = new MockTransport();
-  const mcpAdapter = ProtocolFactory.createMcpAdapter(store);
-  mcpAdapter.setTransport(mockTransport);
+  const mcpProtocol = ProtocolFactory.createMcpProtocol(store) as any; // Use 'as any' to bypass type checking
+  mcpProtocol.setTransport(mockTransport);
   
-  const bridge = createBridge(store, mcpAdapter);
+  const bridge = createBridge(store, mcpProtocol);
   
-  return { store, bridge, storage, adapter: mcpAdapter };
+  return { store, bridge, storage, protocol: mcpProtocol };
 }
 
 Deno.test("Protocol Bridge - Create", async (t) => {

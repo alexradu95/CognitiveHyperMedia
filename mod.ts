@@ -13,9 +13,13 @@ export * from "./src/infrastracture/store/storage_adapter.ts";
 export * from "./src/infrastracture/core/logger.ts";
 export * from "./src/infrastracture/core/debug.ts";
 
-// Adapters
-export * from "./src/adapters/storage/deno/kv_adapter.ts";
-export * from "./src/adapters/protocol/index.ts";
+// Protocol
+export * from "./src/infrastracture/protocol/index.ts";
+
+// Storage
+export * from "./src/infrastracture/storage/index.ts";
+
+// Legacy Adapters (if still needed)
 export * from "./src/adapters/logging/index.ts";
 
 // Additional utilities and types
