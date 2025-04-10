@@ -9,7 +9,7 @@ import {
 } from "../core/resource.ts";
 import { CognitiveCollection, CollectionBuilder, PaginationInfo } from "../core/collection.ts";
 import { StateMachine, StateMachineDefinition, StateMachineBuilder } from "../core/statemachine.ts";
-import { IStorageAdapter, ListOptions, ListResult } from "./storage_adapter.ts";
+import { IStorageAdapter, ListOptions, ListResult } from "../storage/storage.ts";
 import { ResourceNotFoundError, InvalidActionError, InvalidStateTransitionError } from "../core/errors.ts";
 
 /**
@@ -28,6 +28,17 @@ export class CognitiveStore {
   constructor(storage: IStorageAdapter) {
     this.storage = storage;
     this.stateMachines = new Map();
+  }
+
+  /**
+   * 🏭 Creates a new CognitiveStore with Deno KV storage.
+   * @param path - Optional path to the KV database.
+   * @returns A promise resolving to a new CognitiveStore instance with Deno KV storage.
+   */
+  static async createWithStorage(path?: string): Promise<CognitiveStore> {
+    const { createStorage } = await import("../storage/storage.ts");
+    const storage = await createStorage(path);
+    return new CognitiveStore(storage);
   }
 
   /**
