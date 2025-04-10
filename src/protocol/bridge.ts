@@ -1,9 +1,12 @@
 import { CognitiveStore } from "../store/store.ts";
+import { CognitiveResource } from "../core/resource.ts";
+import { CognitiveError, isError } from "../core/types.ts";
 
 /**
- * ✨ Direct interface to cognitive store with protocol capabilities
+ * ✨ Protocol-agnostic bridge for connecting store with any protocol adapter
  * 
- * Simplified bridge that directly connects to the store without adapter abstraction
+ * This simplified bridge provides a clean interface for protocol adapters
+ * without unnecessary complexity.
  */
 export class CognitiveBridge {
   private store: CognitiveStore;
@@ -18,202 +21,169 @@ export class CognitiveBridge {
   }
 
   /**
-   * 🔍 Explore a resource by URI
+   * 🔍 Resolve a URI to a resource
    * 
-   * @param uri - The resource URI to explore
-   * @returns Promise with the resource or collection data
+   * @param uri - URI path to resolve (e.g., "/tasks/123")
+   * @returns The resolved resource or error
    */
-  async explore(uri: string): Promise<any> {
+  async resolveUri(uri: string): Promise<CognitiveResource | CognitiveError> {
     try {
-      const url = new URL(uri, "http://localhost");
-      const pathParts = url.pathname.split('/').filter(Boolean);
-
-      if (pathParts.length === 2) {
-        // Single Resource Request
-        const type = pathParts[0];
-        const id = pathParts[1];
-        const resource = await this.store.get(type, id);
-        return resource ? resource.toJSON() : null;
-      } else if (pathParts.length === 1) {
-        // Collection Request
-        const type = pathParts[0];
-        const options = this.parseQueryParams(url.searchParams);
-        const collection = await this.store.getCollection(type, options);
-        return collection.toJSON();
+      // Skip leading slash if present
+      const normalizedUri = uri.startsWith("/") ? uri.substring(1) : uri;
+      
+      // Special case for root URI
+      if (normalizedUri === "" || normalizedUri === "/") {
+        return await this.getRootResource();
       }
       
-      return null;
+      // Parse URI segments for type and ID
+      const segments = normalizedUri.split("/");
+      
+      if (segments.length === 1) {
+        // Collection request (e.g., "/tasks")
+        return await this.store.getCollection(segments[0]);
+      } else if (segments.length === 2) {
+        // Individual resource request (e.g., "/tasks/123")
+        const [type, id] = segments;
+        const resource = await this.store.get(type, id);
+        
+        if (!resource) {
+          return this.createNotFoundError(type, id);
+        }
+        
+        return resource;
+      }
+      
+      return this.createInvalidUriError(uri);
     } catch (error) {
-      console.error("Error in explore:", error);
-      throw error;
+      return this.createErrorFromException(error);
     }
   }
 
   /**
-   * ⚡ Perform an action on a resource
+   * 🔧 Perform an action on a resource
    * 
-   * @param uri - The resource URI to act upon
-   * @param action - The action to perform
-   * @param payload - Optional data for the action
-   * @returns Promise with the action result
+   * @param uri - URI of the resource (e.g., "/tasks/123")
+   * @param action - Name of the action to perform
+   * @param parameters - Parameters for the action
+   * @returns Result of the action
    */
-  async act(uri: string, action: string, payload?: Record<string, unknown>): Promise<any> {
+  async performAction(
+    uri: string, 
+    action: string, 
+    parameters: Record<string, unknown> = {}
+  ): Promise<CognitiveResource | CognitiveError> {
     try {
-      const uriParts = uri.split('/').filter(Boolean);
-      if (uriParts.length !== 2) return null;
+      // Skip leading slash if present
+      const normalizedUri = uri.startsWith("/") ? uri.substring(1) : uri;
       
-      const type = uriParts[0];
-      const id = uriParts[1];
+      // Parse URI segments
+      const segments = normalizedUri.split("/");
       
-      // Get the resource first to check if it exists
-      const resource = await this.store.get(type, id);
-      if (!resource) return null;
+      if (segments.length !== 2) {
+        return this.createInvalidUriError(uri);
+      }
       
-      // Handle navigation specially
-      if (action === "navigate" && payload?.relation) {
-        return this.navigate(type, id, payload.relation as string);
-      } 
+      const [type, id] = segments;
       
-      // For other actions, use the store's performAction
-      const result = await this.store.performAction(type, id, action, payload || {});
-      return result ? result.toJSON() : null;
+      // Perform the action
+      const result = await this.store.performAction(type, id, action, parameters);
+      if (!result) {
+        return this.createNotFoundError(type, id);
+      }
+      return result;
     } catch (error) {
-      console.error("Error in act:", error);
-      throw error;
+      return this.createErrorFromException(error);
     }
   }
-  
+
   /**
    * ➕ Create a new resource
    * 
-   * @param uri - The resource type URI
-   * @param payload - Data for the new resource
-   * @returns Promise with the new resource
+   * @param type - Type of resource to create
+   * @param data - Resource data
+   * @returns The created resource
    */
-  async create(uri: string, payload: Record<string, unknown>): Promise<any> {
+  async createResource(
+    type: string,
+    data: Record<string, unknown>
+  ): Promise<CognitiveResource | CognitiveError> {
     try {
-      const type = uri.split('/').filter(Boolean)[0];
-      if (!type) return null;
-      
-      const result = await this.store.create(type, payload);
-      return result ? result.toJSON() : null;
+      return await this.store.create(type, data);
     } catch (error) {
-      console.error("Error in create:", error);
-      throw error;
+      return this.createErrorFromException(error);
     }
   }
-  
+
+  // Private helper methods
+
   /**
-   * 🧭 Navigate from a resource following a relation
-   * 
-   * @param type - Resource type
-   * @param id - Resource ID
-   * @param relation - Relation to follow
-   * @returns Promise with the target resource(s)
+   * Get the root resource (entry point)
    */
-  private async navigate(type: string, id: string, relation: string): Promise<any> {
-    console.log(`Navigating from ${type}/${id} with relation ${relation}`);
+  private async getRootResource(): Promise<CognitiveResource> {
+    // Create a root resource with links to collections
+    const types = await this.store.getResourceTypes();
     
-    const resource = await this.store.get(type, id);
-    if (!resource) {
-      console.log(`Resource ${type}/${id} not found`);
-      return null;
+    const root = new CognitiveResource({
+      id: "root",
+      type: "system",
+      properties: {
+        name: "Cognitive Hypermedia API Root",
+        description: "Entry point for the Cognitive Hypermedia API",
+      }
+    });
+    
+    // Add links to each resource type collection
+    for (const type of types) {
+      root.addLink({
+        rel: "collection",
+        href: `/${type}`,
+        title: `${type} collection`,
+      });
     }
     
-    // First check standard links
-    let links = resource.getLinks().filter(link => link.rel === relation);
-    
-    // If no links found, check properties.links
-    if (links.length === 0) {
-      const properties = resource.getProperties();
-      const propsLinks = properties.get('links');
-      
-      if (propsLinks && Array.isArray(propsLinks)) {
-        links = (propsLinks as any[]).filter(link => 
-          link && typeof link === 'object' && link.rel === relation
-        );
-        console.log(`Found ${links.length} links in properties.links with relation ${relation}:`, links);
-      }
-    }
-    
-    if (links.length === 0) {
-      // If still no links, check for ID reference properties
-      const properties = resource.getProperties();
-      const refProp = `${relation}Id`;
-      if (properties.has(refProp) && typeof properties.get(refProp) === 'string') {
-        const targetId = properties.get(refProp) as string;
-        console.log(`Found ID reference property ${refProp}: ${targetId}`);
-        
-        // Create synthetic link
-        links = [{ 
-          rel: relation,
-          href: `/${relation}/${targetId}`
-        }];
-      }
-    }
-    
-    console.log(`Final links: ${links.length} with relation ${relation}:`, links);
-    
-    if (links.length === 0) return null;
-    
-    const results = [];
-    for (const link of links) {
-      const href = link.href;
-      if (!href.startsWith('/')) {
-        console.log(`Skipping link with invalid href: ${href}`);
-        continue;
-      }
-      
-      const targetParts = href.substring(1).split('/');
-      if (targetParts.length !== 2) {
-        console.log(`Skipping link with invalid format: ${href}`);
-        continue;
-      }
-      
-      const [targetType, targetId] = targetParts;
-      console.log(`Resolving link to ${targetType}/${targetId}`);
-      
-      const targetResource = await this.store.get(targetType, targetId);
-      if (targetResource) {
-        console.log(`Target resource found: ${targetType}/${targetId}`);
-        results.push(targetResource.toJSON());
-      } else {
-        console.log(`Target resource not found: ${targetType}/${targetId}`);
-      }
-    }
-    
-    console.log(`Navigation results: ${results.length} resources found`);
-    
-    return results.length === 0 ? null : 
-           results.length === 1 ? results[0] : 
-           results;
+    return root;
   }
-  
+
   /**
-   * Parse query parameters for collection operations
+   * Create an error for resource not found
    */
-  private parseQueryParams(params: URLSearchParams): Record<string, any> {
-    const options: Record<string, any> = {};
-    const filter: Record<string, unknown> = {};
-    
-    for (const [key, value] of params.entries()) {
-      if (key === "page") {
-        const pageNum = parseInt(value, 10);
-        if (!isNaN(pageNum) && pageNum > 0) options.page = pageNum;
-      } else if (key === "pageSize") {
-        const sizeNum = parseInt(value, 10);
-        if (!isNaN(sizeNum) && sizeNum > 0) options.pageSize = sizeNum;
-      } else {
-        // Assume other params are filters
-        filter[key] = value;
-      }
+  private createNotFoundError(type: string, id: string): CognitiveError {
+    return {
+      _type: "error",
+      code: "resource_not_found",
+      message: `Resource ${type}/${id} not found`,
+      details: { resourceType: type, resourceId: id }
+    };
+  }
+
+  /**
+   * Create an error for invalid URI
+   */
+  private createInvalidUriError(uri: string): CognitiveError {
+    return {
+      _type: "error",
+      code: "invalid_uri",
+      message: `Invalid URI: ${uri}`,
+      details: { uri }
+    };
+  }
+
+  /**
+   * Create an error from an exception
+   */
+  private createErrorFromException(error: unknown): CognitiveError {
+    if (isError(error)) {
+      return error as CognitiveError;
     }
     
-    if (Object.keys(filter).length > 0) {
-      options.filter = filter;
-    }
+    const message = error instanceof Error ? error.message : String(error);
     
-    return options;
+    return {
+      _type: "error",
+      code: "internal_error",
+      message: `An error occurred: ${message}`
+    };
   }
 }
 

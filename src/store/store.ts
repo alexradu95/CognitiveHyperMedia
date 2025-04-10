@@ -394,209 +394,226 @@ export class CognitiveStore {
 
   /**
    * 🧰 Enhances a resource with actions, state information, presentation hints, etc.
-   * This is a private method called automatically by the public retrieval methods.
-   * @param resource - The resource to enhance.
+   * 
+   * Uses a modular, pipeline-based approach where each enhancement type is a distinct plugin.
+   * This makes the system more maintainable and extensible.
+   * 
+   * @param resource - The resource to enhance
    */
   private enhanceResource(resource: CognitiveResource): void {
+    // Apply each enhancement in sequence
+    this.applyResourceEnhancements(resource, [
+      this.enhanceWithStandardActions.bind(this),
+      this.enhanceWithStateMachine.bind(this),
+      this.enhanceWithRelationships.bind(this),
+      this.enhanceWithPresentationHints.bind(this),
+      this.enhanceWithConversationPrompts.bind(this)
+    ]);
+  }
+
+  /**
+   * Apply a series of enhancement functions to a resource
+   */
+  private applyResourceEnhancements(
+    resource: CognitiveResource, 
+    enhancers: Array<(r: CognitiveResource) => void>
+  ): void {
+    for (const enhancer of enhancers) {
+      if (typeof enhancer === 'function') {
+        enhancer(resource);
+      }
+    }
+  }
+
+  /**
+   * Enhance resource with standard CRUD actions
+   */
+  private enhanceWithStandardActions(resource: CognitiveResource): void {
     const type = resource.getType();
     const id = resource.getId();
     
-    // Add standard actions that all resources have
-    this.addStandardActions(resource);
-    
-    // Add type-specific actions and state info if a state machine exists
-    if (this.stateMachines.has(type)) {
-      this.enhanceWithStateMachine(resource);
-    }
-    
-    // Enhance with domain-specific presentation hints
-    this.addPresentationHints(resource);
-    
-    // Add relationship links if the resource references other resources
-    this.addResourceLinks(resource);
-    
-    // Add prompt suggestions based on resource type and state
-    this.addPromptSuggestions(resource);
-  }
-
-  /**
-   * Adds standard actions that every resource supports
-   */
-  private addStandardActions(resource: CognitiveResource): void {
-    const type = resource.getType();
-    
-    // All resources can be deleted
-    resource.addAction("delete", {
-      description: `Delete this ${type}`,
-      effect: "Permanently removes this resource",
-      confirmation: `Are you sure you want to delete this ${type}?`,
+    // Add standard "get" action (primarily for documentation)
+    resource.addAction("get", {
+      description: "Retrieve this resource",
+      parameters: {}
     });
     
-    // All resources can be updated
+    // Add standard "update" action
     resource.addAction("update", {
       description: `Update this ${type}`,
+      effect: "Updates the properties of this resource",
       parameters: {
         properties: {
-          type: "object",
-          description: `Properties to update for this ${type}`,
-          required: true,
-        },
-      },
+          type: "object", 
+          description: `Updated properties for the ${type}`,
+          required: true
+        }
+      }
+    });
+    
+    // Add standard "delete" action
+    resource.addAction("delete", {
+      description: `Delete this ${type}`,
+      confirmation: `Are you sure you want to delete this ${type}?`,
+      effect: "Permanently removes this resource"
     });
   }
 
   /**
-   * Enhances a resource with state machine related information
+   * Enhance resource with state machine transitions
+   * Only applies if a state machine exists for this resource type
    */
   private enhanceWithStateMachine(resource: CognitiveResource): void {
     const type = resource.getType();
-    const stateMachine = this.stateMachines.get(type)!; // We already checked it exists
-    const currentState = resource.getProperty("status") as string;
     
-    if (!currentState) return; // No state to work with
-    
-    // Add state as property for backward compatibility with tests
-    resource.setProperty("_stateName", currentState);
-    
-    // Get allowed transitions from the state machine
-    const stateDefinition = stateMachine.getStateDefinition(currentState);
-    if (!stateDefinition) return;
-    
-    // If there's a description, add that too
-    if (stateDefinition.description) {
-      resource.setProperty("_stateDescription", stateDefinition.description);
+    // Skip if no state machine exists for this type
+    if (!this.stateMachines.has(type)) {
+      return;
     }
     
-    // ALWAYS add cancel action for tasks in any state to satisfy tests
-    if (type === "task") {
-      resource.addAction("cancel", {
-        description: "Cancel this task",
-        effect: "Changes state from current to cancelled",
-      });
+    const properties = resource.getProperties();
+    const currentState = properties.get("status") as string;
+    const stateMachine = this.stateMachines.get(type)!;
+    
+    // Skip if no current state (should not happen)
+    if (!currentState) {
+      return;
     }
     
-    // Set up resource state object
-    const resourceState = {
+    // Get available transitions from the current state
+    const transitions = stateMachine.getTransitionsFrom(currentState);
+    
+    // Create actions for each valid transition
+    for (const transition of transitions) {
+      const actionId = `transition-to-${transition.target}`;
+      const definition = {
+        description: transition.description || `Change status to ${transition.target}`,
+        effect: `Changes the status from '${currentState}' to '${transition.target}'`,
+        parameters: transition.parameters || {}
+      };
+      
+      resource.addAction(actionId, definition);
+    }
+    
+    // Add state information to the resource
+    resource.setState({
       current: currentState,
-      description: stateDefinition.description,
-      allowedTransitions: [] as string[],
-      history: (resource.getProperty("stateHistory") as Array<unknown> || []).map(entry => {
-        // Convert unknown entries to StateHistoryEntry type
-        const historyEntry = entry as {
-          state: string;
-          enteredAt: string;
-          exitedAt?: string;
-          actor?: string;
-        };
-        return historyEntry;
-      }),
-    };
-    
-    // Add actions for each allowed transition
-    if (stateDefinition.transitions) {
-      for (const [action, transition] of Object.entries(stateDefinition.transitions)) {
-        resourceState.allowedTransitions.push(action);
-        
-        // Add an action for this transition
-        resource.addAction(action, {
-          description: transition.description || `Transition to ${transition.target} state`,
-          effect: `Changes state from ${currentState} to ${transition.target}`,
-        });
-      }
-    }
-    
-    // Set the resource state
-    resource.setState(resourceState);
+      description: stateMachine.getStateDescription(currentState),
+      allowedTransitions: transitions.map(t => t.target),
+    });
   }
 
   /**
-   * Adds presentation hints based on resource type and state
+   * Enhance resource with relationship links
    */
-  private addPresentationHints(resource: CognitiveResource): void {
-    const type = resource.getType();
-    const hints: PresentationHints = {};
-    
-    // Add only generic visualization hints, let apps define their own
-    switch (type) {
-      case "collection":
-        hints.visualization = "list";
-        hints.icon = "folder";
-        break;
-        
-      // Apps should define their own type-specific hints
-    }
-    
-    if (Object.keys(hints).length > 0) {
-      resource.setPresentation(hints);
-    }
-  }
-
-  /**
-   * Adds links to related resources
-   */
-  private addResourceLinks(resource: CognitiveResource): void {
+  private enhanceWithRelationships(resource: CognitiveResource): void {
     const properties = resource.getProperties();
     
-    // Look for properties that might reference other resources
+    // Look for ID references (properties ending with 'Id')
     for (const [key, value] of properties.entries()) {
-      // Skip null/undefined values and known non-reference fields
-      if (value === null || value === undefined) continue;
-      if (["id", "type", "createdAt", "updatedAt", "status"].includes(key)) continue;
-      
-      // Process "links" property if it's an array
-      if (key === "links" && Array.isArray(value)) {
-        for (const link of value) {
-          if (link && typeof link === "object" && "rel" in link && "href" in link) {
-            // Check if this link already exists
-            const existingLinks = resource.getLinks();
-            const linkExists = existingLinks.some(existing => 
-              existing.rel === link.rel && existing.href === link.href
-            );
-            
-            if (!linkExists) {
-              resource.addLink(link);
-            }
-          }
-        }
+      // Skip non-string values and non-ID fields
+      if (typeof value !== 'string' || !key.endsWith('Id')) {
         continue;
       }
       
-      // Check for ID references (properties ending with 'Id')
-      if (typeof value === 'string' && key.endsWith('Id')) {
-        // Extract the resource type from the property name (e.g., projectId -> project)
-        const refType = key.substring(0, key.length - 2);
-        
-        // Add link if it doesn't already exist
-        const href = `/${refType}/${value}`;
-        
-        // Check if this link already exists by searching existing links
-        const existingLinks = resource.getLinks();
-        const linkExists = existingLinks.some(link => 
-          link.rel === refType && link.href === href
-        );
-        
-        if (!linkExists) {
-          resource.addLink({
-            rel: refType,
-            href,
-            title: `Related ${refType}`,
-          });
-        }
-      }
+      // Extract relationship type from property name (e.g., projectId -> project)
+      const relationType = key.substring(0, key.length - 2);
+      const relationId = value;
+      
+      // Add a link for the relationship
+      resource.addLink({
+        rel: relationType,
+        href: `/${relationType}/${relationId}`,
+        title: `Related ${relationType}`
+      });
     }
   }
 
   /**
-   * Adds conversation prompts based on resource state
+   * Enhance resource with type-specific presentation hints
    */
-  private addPromptSuggestions(resource: CognitiveResource): void {
-    // Add only generic prompt suggestion
-    resource.addPrompt({
-      type: "suggestion",
-      text: "What actions can I perform on this?",
-    });
+  private enhanceWithPresentationHints(resource: CognitiveResource): void {
+    const type = resource.getType();
     
-    // Apps should define their own type-specific prompts
+    // Add type-specific presentation hints
+    // This is simplified; in a real system, this would be more dynamic
+    // and possibly loaded from configuration
+    switch (type) {
+      case "task":
+        resource.setPresentation({
+          icon: "task_alt",
+          color: "#4285F4", 
+          primaryProperty: "title",
+          secondaryProperty: "description",
+          metadata: ["status", "dueDate"]
+        });
+        break;
+        
+      case "note":
+        resource.setPresentation({
+          icon: "note",
+          color: "#0F9D58",
+          primaryProperty: "title",
+          secondaryProperty: "content",
+          metadata: ["createdAt"]
+        });
+        break;
+        
+      case "user":
+        resource.setPresentation({
+          icon: "person",
+          color: "#7B1FA2",
+          primaryProperty: "name",
+          secondaryProperty: "email",
+          metadata: ["role", "department"]
+        });
+        break;
+        
+      default:
+        // Default presentation for other types
+        resource.setPresentation({
+          icon: "description",
+          primaryProperty: "name",
+          secondaryProperty: "description"
+        });
+    }
+  }
+
+  /**
+   * Enhance resource with conversation prompts
+   */
+  private enhanceWithConversationPrompts(resource: CognitiveResource): void {
+    const type = resource.getType();
+    const properties = resource.getProperties();
+    
+    // Add prompts based on resource type and state
+    switch (type) {
+      case "task":
+        const status = properties.get("status") as string;
+        
+        if (status === "todo") {
+          resource.addPrompt({
+            type: "suggestion",
+            text: "Start working on this task?",
+            action: "transition-to-in_progress"
+          });
+        } else if (status === "in_progress") {
+          resource.addPrompt({
+            type: "suggestion",
+            text: "Mark this task as completed?",
+            action: "transition-to-done"
+          });
+        }
+        break;
+        
+      case "note":
+        resource.addPrompt({
+          type: "follow-up",
+          text: "Would you like to convert this note to a task?",
+          action: "convert-to-task"
+        });
+        break;
+    }
   }
 
   /**
