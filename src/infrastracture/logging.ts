@@ -1,8 +1,7 @@
 /**
- * 📝 Flexible, extensible logging system for the Cognitive Hypermedia Framework.
+ * 📝 Simple console-based logging system for the Cognitive Hypermedia Framework.
  * 
- * This module provides a platform-agnostic logging system that can be extended
- * with custom transport adapters for different output destinations.
+ * This module provides a platform-agnostic logging system with a console transport.
  */
 
 /**
@@ -79,61 +78,13 @@ export function createConsoleTransport(): LogTransport {
 }
 
 /**
- * 📁 File transport that logs to a file
- */
-export function createFileTransport(options: { path: string }): LogTransport {
-  let minLevel = LogLevel.INFO;
-  
-  return {
-    log(data: LogData): void {
-      if (data.level < minLevel) return;
-      
-      // Since we're platform-agnostic, we're leaving the actual file writing
-      // implementation to be handled by the environment-specific adapter
-      // This would be implemented in the adapters layer
-      console.error(`[FileTransport] Would log to ${options.path}: ${JSON.stringify(data)}`);
-    },
-    
-    setMinLevel(level: LogLevel): void {
-      minLevel = level;
-    }
-  };
-}
-
-/**
- * 🧩 Composite transport that logs to multiple transports
- */
-export function createCompositeTransport(transports: LogTransport[]): LogTransport {
-  let minLevel = LogLevel.INFO;
-  
-  return {
-    log(data: LogData): Promise<void> {
-      if (data.level < minLevel) return Promise.resolve();
-      
-      const promises = transports.map(transport => {
-        const result = transport.log(data);
-        return result instanceof Promise ? result : Promise.resolve(result);
-      });
-      
-      return Promise.all(promises).then(() => {});
-    },
-    
-    setMinLevel(level: LogLevel): void {
-      minLevel = level;
-      transports.forEach(transport => transport.setMinLevel(level));
-    }
-  };
-}
-
-/**
- * ✨ Creates a logger instance with the specified transports
+ * ✨ Creates a logger instance 
  * 
  * @param name - The name of the logger
- * @param transports - An array of log transports to use
  * @returns A logger object with methods for each log level
  */
-export function createLogger(name: string, transports: LogTransport | LogTransport[] = [createConsoleTransport()]) {
-  const loggerTransports = Array.isArray(transports) ? transports : [transports];
+export function createLogger(name: string) {
+  const loggerTransport = createConsoleTransport();
   
   function log(level: LogLevel, message: string, context?: Record<string, unknown>): void {
     const data: LogData = {
@@ -144,13 +95,11 @@ export function createLogger(name: string, transports: LogTransport | LogTranspo
       logger: name,
     };
     
-    loggerTransports.forEach(transport => {
-      try {
-        transport.log(data);
-      } catch (error) {
-        console.error(`Failed to log with transport: ${error}`);
-      }
-    });
+    try {
+      loggerTransport.log(data);
+    } catch (error) {
+      console.error(`Failed to log: ${error}`);
+    }
   }
   
   return {
@@ -187,16 +136,21 @@ export function createLogger(name: string, transports: LogTransport | LogTranspo
     },
     
     setMinLevel: (level: LogLevel) => {
-      loggerTransports.forEach(transport => transport.setMinLevel(level));
+      loggerTransport.setMinLevel(level);
     },
     
     child: (childName: string) => {
-      return createLogger(`${name}:${childName}`, loggerTransports);
+      return createLogger(`${name}:${childName}`);
     }
   };
 }
 
 /**
- * 🌐 Global default logger instance
+ * 🌐 Default application logger instance
  */
-export const logger = createLogger('app'); 
+export const logger = createLogger('app');
+
+/**
+ * 🌐 Alias for backward compatibility
+ */
+export const coreLogger = logger; 
