@@ -98,8 +98,13 @@ async function main() {
         console.log = originalConsoleLog;
       };
       
-      Deno.addSignalListener("SIGINT", cleanup);
-      Deno.addSignalListener("SIGTERM", cleanup);
+      // Only add signal handlers for Windows-supported signals
+      Deno.addSignalListener("SIGINT", cleanup);  // Ctrl+C
+      
+      // On Windows, also add SIGBREAK if this code is running on Windows
+      if (Deno.build.os === "windows") {
+        Deno.addSignalListener("SIGBREAK", cleanup);  // Ctrl+Break
+      }
       
     } catch (error: unknown) {
       console.error("❌ Error setting up MCP server:", error);
