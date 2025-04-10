@@ -251,6 +251,29 @@ export class CognitiveStore {
     // Build the collection
     const collection = collectionBuilder.build();
 
+    // Add standard collection actions
+    collection.addAction("create", {
+      description: `Create a new ${type}`,
+      parameters: {
+        properties: {
+          type: "object",
+          description: `Properties for the new ${type}`,
+          required: true,
+        },
+      },
+    });
+
+    collection.addAction("filter", {
+      description: `Filter ${type} collection`,
+      parameters: {
+        properties: {
+          type: "object",
+          description: `Filter criteria for ${type} resources`,
+          required: true,
+        },
+      },
+    });
+
     return collection;
   }
 
@@ -515,10 +538,28 @@ export class CognitiveStore {
     const properties = resource.getProperties();
     
     // Look for properties that might reference other resources
-    for (const [key, value] of Object.entries(properties)) {
+    for (const [key, value] of properties.entries()) {
       // Skip null/undefined values and known non-reference fields
       if (value === null || value === undefined) continue;
-      if (["id", "type", "createdAt", "updatedAt", "status", "links"].includes(key)) continue;
+      if (["id", "type", "createdAt", "updatedAt", "status"].includes(key)) continue;
+      
+      // Process "links" property if it's an array
+      if (key === "links" && Array.isArray(value)) {
+        for (const link of value) {
+          if (link && typeof link === "object" && "rel" in link && "href" in link) {
+            // Check if this link already exists
+            const existingLinks = resource.getLinks();
+            const linkExists = existingLinks.some(existing => 
+              existing.rel === link.rel && existing.href === link.href
+            );
+            
+            if (!linkExists) {
+              resource.addLink(link);
+            }
+          }
+        }
+        continue;
+      }
       
       // Check for ID references (properties ending with 'Id')
       if (typeof value === 'string' && key.endsWith('Id')) {
