@@ -1,13 +1,12 @@
-// Import from the framework
+// Import all components from the framework
 import { 
   CognitiveStore,
   StorageFactory,
-  createBridge
+  createBridge,
+  // MCP components now available directly from the framework
+  McpServer,
+  StdioServerTransport
 } from "../../mod.ts";
-
-// Import MCP components from the SDK
-import { McpServer } from "npm:@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk/server/stdio.js";
 
 // Import our modular components
 import { taskStateMachineDefinition } from "./state_machine/index.ts";
@@ -51,14 +50,9 @@ async function setupMcpServer(store: CognitiveStore) {
  */
 async function main() {
   try {
-    // Create a persistent store adapter using Deno KV
-    const kv = await Deno.openKv();
-    const kvStorage = StorageFactory.createDenoKvStorageWithInstance(kv);
-    console.error("✅ Deno KV storage created.");
-
-    // Initialize cognitive store with KV storage
-    const store = new CognitiveStore(kvStorage);
-    console.error("✅ Cognitive store initialized.");
+    // Create a cognitive store with Deno KV storage in one step
+    const store = await StorageFactory.createStore();
+    console.error("✅ Cognitive store initialized with Deno KV.");
     
     // Create a bridge for the store
     const bridge = createBridge(store);
