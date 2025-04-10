@@ -1,0 +1,14 @@
+=== STATE MACHINE BUILDER EXAMPLE LOG ===
+Creating store...
+✅ Store created successfully!
+Creating state machine definition...
+✅ State machine definition created
+✅ State machine registered for document type
+Creating a document...
+✅ Document created with ID: db7d3eea-6aed-49c4-a35c-c16bedf9bbca
+Initial status: draft
+Submitting document for review...
+✅ New status: review
+
+Example completed successfully! ✨
+Check the log file 'state-machine-builder-example.log' for complete output.

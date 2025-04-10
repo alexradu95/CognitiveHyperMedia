@@ -3,9 +3,9 @@
 import { assert } from "https://deno.land/std@0.224.0/assert/assert.ts";
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/assert_equals.ts";
 import { assertExists } from "https://deno.land/std@0.224.0/assert/assert_exists.ts";
-import { StateMachineDefinition } from "../../src/infrastracture/core/statemachine.ts";
-import { CognitiveStore } from "../../src/infrastracture/store/store.ts";
-import { createBridge } from "../../src/infrastracture/protocol/bridge.ts";
+import { StateMachineDefinition } from "../../src/core/statemachine.ts";
+import { CognitiveStore } from "../../src/store/store.ts";
+import { createBridge } from "../../src/protocol/bridge.ts";
 
 // Mock implementation of IStorageAdapter to avoid Deno.Kv dependency issues
 class MockStorageAdapter {

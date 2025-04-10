@@ -1,8 +1,8 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/assert_equals.ts";
 import { assertExists } from "https://deno.land/std@0.224.0/assert/assert_exists.ts";
-import { CognitiveCollection } from "../../src/infrastracture/core/collection.ts";
-import { CognitiveResource } from "../../src/infrastracture/core/resource.ts";
-import { PaginationInfo } from "../../src/infrastracture/core/types.ts";
+import { CognitiveCollection } from "../../src/core/collection.ts";
+import { CognitiveResource } from "../../src/core/resource.ts";
+import { PaginationInfo } from "../../src/core/types.ts";
 
 
 

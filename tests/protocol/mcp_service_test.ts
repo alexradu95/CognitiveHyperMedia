@@ -2,9 +2,9 @@
 
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/assert_equals.ts";
 import { assertExists } from "https://deno.land/std@0.224.0/assert/assert_exists.ts";
-import { CognitiveStore } from "../../src/infrastracture/store/store.ts";
-import { createBridge, CognitiveBridge } from "../../src/infrastracture/protocol/bridge.ts";
-import { createMcpService, McpService } from "../../src/infrastracture/protocol/mcp.ts";
+import { CognitiveStore } from "../../src/store/store.ts";
+import { createBridge, CognitiveBridge } from "../../src/protocol/bridge.ts";
+import { createMcpService, McpService } from "../../src/protocol/mcp.ts";
 
 // Mock transport implementation for testing
 class MockTransport {
