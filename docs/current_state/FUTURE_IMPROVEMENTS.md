@@ -211,3 +211,14 @@ Implement the e-commerce example from the white paper:
 - **Category Resources**: Hierarchical product organization  
 - **Cart & Order Resources**: Shopping cart and order processing
 - **Review Resources**: Product reviews and ratings
+
+## Storage Infrastructure
+
+- ✅ **Simplified Storage Architecture**: Consolidated storage implementations into a single file for easier maintenance and streamlined architecture.
+- [ ] **MongoDB Storage Adapter**: Implement an adapter for MongoDB database storage.
+- [ ] **PostgreSQL Storage Adapter**: Implement an adapter for PostgreSQL database storage.
+- [ ] **Redis Storage Adapter**: Implement an adapter for Redis database storage.
+- [ ] **Optimistic Locking**: Add support for optimistic concurrency control for handling concurrent updates.
+- [ ] **Atomic Transactions**: Support for atomic operations that involve multiple records.
+- [ ] **Storage Migration Utilities**: Tools for migrating data between different storage implementations.
+- [ ] **Query Builder**: A fluent interface for constructing complex queries.

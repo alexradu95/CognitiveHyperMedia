@@ -89,3 +89,9 @@
    - Partial resource updates
    - Bulk operations for collections
    - Efficient pagination for large collections
+
+## Storage
+
+- [ ] Add IndexedDB adapter for browser environments
+- [ ] Add support for atomic transactions in Deno KV storage
+- [ ] Implement optimistic locking for concurrent updates

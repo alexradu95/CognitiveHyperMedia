@@ -46,4 +46,10 @@
 
 1. **Missing Multi-Modal Support:** No implementation yet for the multi-modal extensions described in section 9.1 of the white paper.
 
-2. **Collaborative Features:** Need to implement the collaborative cognition features outlined in section 9.4. 
+2. **Collaborative Features:** Need to implement the collaborative cognition features outlined in section 9.4.
+
+## Storage
+
+- ✅ Simplified storage architecture by consolidating into a single file implementation
+- [ ] Fix potential race condition in list operation when items are added/removed during pagination
+- [ ] Improve error handling for storage operations with more specific error types 
