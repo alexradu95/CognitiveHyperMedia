@@ -18,16 +18,16 @@ import { ResourceNotFoundError, InvalidActionError, InvalidStateTransitionError 
  * Based on Section 6.3 of the white paper.
  */
 export class CognitiveStore {
-  #storage: IStorageAdapter;
-  #stateMachines: Map<string, StateMachine>;
+  private storage: IStorageAdapter;
+  private stateMachines: Map<string, StateMachine>;
 
   /**
    * ⚙️ Creates a new CognitiveStore instance.
    * @param storage - A storage adapter instance implementing IStorageAdapter.
    */
   constructor(storage: IStorageAdapter) {
-    this.#storage = storage;
-    this.#stateMachines = new Map();
+    this.storage = storage;
+    this.stateMachines = new Map();
   }
 
   /**
@@ -40,7 +40,7 @@ export class CognitiveStore {
     definition: StateMachineDefinition
   ): void {
     const stateMachine = new StateMachine(definition);
-    this.#stateMachines.set(type, stateMachine);
+    this.stateMachines.set(type, stateMachine);
     console.log(`Registered state machine for type: ${type}`);
   }
 
@@ -50,7 +50,7 @@ export class CognitiveStore {
    * @returns The state machine, or undefined if not registered
    */
   getStateMachine(type: string): StateMachine | undefined {
-    return this.#stateMachines.get(type);
+    return this.stateMachines.get(type);
   }
 
   /**
@@ -77,13 +77,13 @@ export class CognitiveStore {
     };
 
     // Set initial state if a state machine exists for this type
-    const stateMachine = this.#stateMachines.get(type);
+    const stateMachine = this.stateMachines.get(type);
     if (stateMachine) {
       resourceData.status = stateMachine.getInitialState();
     }
 
     // Store using the adapter
-    await this.#storage.create(type, id, resourceData);
+    await this.storage.create(type, id, resourceData);
 
     // Create the resource instance
     const resource = new CognitiveResource({
@@ -93,7 +93,7 @@ export class CognitiveStore {
     });
 
     // Enhance with standard actions, relationships, etc.
-    this.#enhanceResource(resource);
+    this.enhanceResource(resource);
 
     return resource;
   }
@@ -105,7 +105,7 @@ export class CognitiveStore {
    * @returns A promise resolving to the enhanced CognitiveResource, or null if not found.
    */
   async get(type: string, id: string): Promise<CognitiveResource | null> {
-    const result = await this.#storage.get(type, id);
+    const result = await this.storage.get(type, id);
 
     if (!result) {
       return null; // Return null for not found resources
@@ -119,7 +119,7 @@ export class CognitiveStore {
     });
 
     // Enhance with actions, state info, relationships, etc.
-    this.#enhanceResource(resource);
+    this.enhanceResource(resource);
 
     return resource;
   }
@@ -140,7 +140,7 @@ export class CognitiveStore {
     updates: Record<string, unknown>
   ): Promise<CognitiveResource> {
     // 1. Get existing data
-    const existingData = await this.#storage.get(type, id);
+    const existingData = await this.storage.get(type, id);
     if (!existingData) {
       throw new Error(`Resource ${type}/${id} not found for update.`);
     }
@@ -157,14 +157,14 @@ export class CognitiveStore {
     };
 
     // Prevent direct status updates if a state machine manages this type
-    if ('status' in updates && this.#stateMachines.has(type)) {
+    if ('status' in updates && this.stateMachines.has(type)) {
       throw new Error(
         `Direct status updates are not allowed for type '${type}'. Use performAction for state transitions.`
       );
     }
 
     // 3. Update in storage
-    await this.#storage.update(type, id, updatedData);
+    await this.storage.update(type, id, updatedData);
 
     // 4. Create and enhance the updated resource instance
     const resource = new CognitiveResource({
@@ -173,7 +173,7 @@ export class CognitiveStore {
       properties: updatedData,
     });
 
-    this.#enhanceResource(resource);
+    this.enhanceResource(resource);
 
     return resource;
   }
@@ -187,7 +187,7 @@ export class CognitiveStore {
    */
   async delete(type: string, id: string): Promise<void> {
     // Don't check if exists - tests expect this to work silently
-    await this.#storage.delete(type, id);
+    await this.storage.delete(type, id);
   }
 
   /**
@@ -203,7 +203,7 @@ export class CognitiveStore {
     const { filter = {}, page = 1, pageSize = 10 } = options;
 
     // Use storage adapter to list items
-    const result = await this.#storage.list(type, {
+    const result = await this.storage.list(type, {
       filter,
       page,
       pageSize,
@@ -220,7 +220,7 @@ export class CognitiveStore {
         type,
         properties: data,
       });
-      this.#enhanceResource(resource);
+      this.enhanceResource(resource);
       collectionBuilder.item(resource);
     }
 
@@ -239,9 +239,6 @@ export class CognitiveStore {
 
     // Build the collection
     const collection = collectionBuilder.build();
-
-    // Enhance the collection with collection-level actions
-    this.#enhanceCollectionWithActions(collection, type);
 
     return collection;
   }
@@ -271,7 +268,7 @@ export class CognitiveStore {
     }
   
     // 1. Get the current resource state
-    const existingData = await this.#storage.get(type, id);
+    const existingData = await this.storage.get(type, id);
     if (!existingData) {
       throw new Error(`Resource ${type}/${id} not found for action '${actionName}'.`);
     }
@@ -282,7 +279,7 @@ export class CognitiveStore {
       type,
       properties: existingData,
     });
-    this.#enhanceResource(resource);
+    this.enhanceResource(resource);
 
     // 2. Check if this action is allowed for this resource
     const action = resource.getAction(actionName);
@@ -304,7 +301,7 @@ export class CognitiveStore {
     }
 
     // 3. Check if there's a state machine for this resource type
-    const stateMachine = this.#stateMachines.get(type);
+    const stateMachine = this.stateMachines.get(type);
     let targetState: string | undefined;
 
     // 4. If there's a state machine, validate and prepare for state transition
@@ -348,7 +345,7 @@ export class CognitiveStore {
       ...existingData,
       ...updates,
     };
-    await this.#storage.update(type, id, updatedData);
+    await this.storage.update(type, id, updatedData);
 
     // 7. Create a fresh resource with the updated data
     const updatedResource = new CognitiveResource({
@@ -356,7 +353,7 @@ export class CognitiveStore {
       type,
       properties: updatedData,
     });
-    this.#enhanceResource(updatedResource);
+    this.enhanceResource(updatedResource);
 
     return updatedResource;
   }
@@ -366,32 +363,32 @@ export class CognitiveStore {
    * This is a private method called automatically by the public retrieval methods.
    * @param resource - The resource to enhance.
    */
-  #enhanceResource(resource: CognitiveResource): void {
+  private enhanceResource(resource: CognitiveResource): void {
     const type = resource.getType();
     const id = resource.getId();
     
     // Add standard actions that all resources have
-    this.#addStandardActions(resource);
+    this.addStandardActions(resource);
     
     // Add type-specific actions and state info if a state machine exists
-    if (this.#stateMachines.has(type)) {
-      this.#enhanceWithStateMachine(resource);
+    if (this.stateMachines.has(type)) {
+      this.enhanceWithStateMachine(resource);
     }
     
     // Enhance with domain-specific presentation hints
-    this.#addPresentationHints(resource);
+    this.addPresentationHints(resource);
     
     // Add relationship links if the resource references other resources
-    this.#addRelationshipLinks(resource);
+    this.addResourceLinks(resource);
     
     // Add prompt suggestions based on resource type and state
-    this.#addPromptSuggestions(resource);
+    this.addPromptSuggestions(resource);
   }
 
   /**
    * Adds standard actions that every resource supports
    */
-  #addStandardActions(resource: CognitiveResource): void {
+  private addStandardActions(resource: CognitiveResource): void {
     const type = resource.getType();
     
     // All resources can be deleted
@@ -417,9 +414,9 @@ export class CognitiveStore {
   /**
    * Enhances a resource with state machine related information
    */
-  #enhanceWithStateMachine(resource: CognitiveResource): void {
+  private enhanceWithStateMachine(resource: CognitiveResource): void {
     const type = resource.getType();
-    const stateMachine = this.#stateMachines.get(type)!; // We already checked it exists
+    const stateMachine = this.stateMachines.get(type)!; // We already checked it exists
     const currentState = resource.getProperty("status") as string;
     
     if (!currentState) return; // No state to work with
@@ -481,7 +478,7 @@ export class CognitiveStore {
   /**
    * Adds presentation hints based on resource type and state
    */
-  #addPresentationHints(resource: CognitiveResource): void {
+  private addPresentationHints(resource: CognitiveResource): void {
     const type = resource.getType();
     const hints: PresentationHints = {};
     
@@ -503,18 +500,34 @@ export class CognitiveStore {
   /**
    * Adds links to related resources
    */
-  #addRelationshipLinks(resource: CognitiveResource): void {
-    // Simple convention: property ends with 'Id' and has a non-empty string value
-    for (const [propName, value] of resource.getProperties().entries()) {
-      if (typeof propName === 'string' && propName.endsWith('Id') && propName !== 'id' && typeof value === 'string' && value) {
-        const relatedId = value;
-        // Infer related type by removing 'Id' suffix
-        const relatedType = propName.slice(0, -2);
-        if (relatedType) {
+  private addResourceLinks(resource: CognitiveResource): void {
+    const properties = resource.getProperties();
+    
+    // Look for properties that might reference other resources
+    for (const [key, value] of Object.entries(properties)) {
+      // Skip null/undefined values and known non-reference fields
+      if (value === null || value === undefined) continue;
+      if (["id", "type", "createdAt", "updatedAt", "status", "links"].includes(key)) continue;
+      
+      // Check for ID references (properties ending with 'Id')
+      if (typeof value === 'string' && key.endsWith('Id')) {
+        // Extract the resource type from the property name (e.g., projectId -> project)
+        const refType = key.substring(0, key.length - 2);
+        
+        // Add link if it doesn't already exist
+        const href = `/${refType}/${value}`;
+        
+        // Check if this link already exists by searching existing links
+        const existingLinks = resource.getLinks();
+        const linkExists = existingLinks.some(link => 
+          link.rel === refType && link.href === href
+        );
+        
+        if (!linkExists) {
           resource.addLink({
-            rel: relatedType, // Use inferred type as relation type
-            href: `/${relatedType}/${relatedId}`, // Construct a simple path
-            title: `Related ${relatedType}` // Add a basic title
+            rel: refType,
+            href,
+            title: `Related ${refType}`,
           });
         }
       }
@@ -524,7 +537,7 @@ export class CognitiveStore {
   /**
    * Adds conversation prompts based on resource state
    */
-  #addPromptSuggestions(resource: CognitiveResource): void {
+  private addPromptSuggestions(resource: CognitiveResource): void {
     // Add only generic prompt suggestion
     resource.addPrompt({
       type: "suggestion",
@@ -535,46 +548,11 @@ export class CognitiveStore {
   }
 
   /**
-   * Enhances a collection with collection-level actions
-   */
-  #enhanceCollectionWithActions(collection: CognitiveCollection, itemType: string): void {
-    // Add standard collection actions
-    collection.addAction("filter", {
-      description: `Filter ${itemType} collection`,
-      parameters: {
-        criteria: {
-          type: "object",
-          description: "Filter criteria",
-          required: true,
-        },
-      },
-    });
-    
-    collection.addAction("create", {
-      description: `Create a new ${itemType}`,
-      parameters: {
-        properties: {
-          type: "object",
-          description: `Properties for the new ${itemType}`,
-          required: true,
-        },
-      },
-    });
-    
-    // Apps should define their own type-specific collection actions
-  }
-
-  /**
    * ✨ Retrieves all resource types available in the store.
    * @returns A promise resolving to an array of resource type strings.
    */
   async getResourceTypes(): Promise<string[]> {
-    if (this.#storage.listTypes) {
-      return await this.#storage.listTypes();
-    }
-    
-    // Fallback implementation if the adapter doesn't support listTypes
-    throw new Error("Storage adapter doesn't support listing resource types");
+    return this.storage.listTypes();
   }
 }
 

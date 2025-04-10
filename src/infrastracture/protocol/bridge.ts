@@ -65,18 +65,18 @@ export class CognitiveBridge {
       const type = uriParts[0];
       const id = uriParts[1];
       
+      // Get the resource first to check if it exists
       const resource = await this.store.get(type, id);
       if (!resource) return null;
       
-      if (action === "update" && payload) {
-        return this.store.update(type, id, payload);
-      } else if (action === "delete") {
-        return this.store.delete(type, id);
-      } else if (action === "navigate" && payload?.relation) {
+      // Handle navigation specially
+      if (action === "navigate" && payload?.relation) {
         return this.navigate(type, id, payload.relation as string);
-      }
+      } 
       
-      return null;
+      // For other actions, use the store's performAction
+      const result = await this.store.performAction(type, id, action, payload || {});
+      return result ? result.toJSON() : null;
     } catch (error) {
       console.error("Error in act:", error);
       throw error;
@@ -112,23 +112,81 @@ export class CognitiveBridge {
    * @returns Promise with the target resource(s)
    */
   private async navigate(type: string, id: string, relation: string): Promise<any> {
-    const resource = await this.store.get(type, id);
-    if (!resource) return null;
+    console.log(`Navigating from ${type}/${id} with relation ${relation}`);
     
-    const links = resource.getLinks().filter(link => link.rel === relation);
+    const resource = await this.store.get(type, id);
+    if (!resource) {
+      console.log(`Resource ${type}/${id} not found`);
+      return null;
+    }
+    
+    // First check standard links
+    let links = resource.getLinks().filter(link => link.rel === relation);
+    
+    // If no links found, check properties.links
+    if (links.length === 0) {
+      const properties = resource.getProperties();
+      const propsLinks = properties.get('links');
+      
+      if (propsLinks && Array.isArray(propsLinks)) {
+        links = (propsLinks as any[]).filter(link => 
+          link && typeof link === 'object' && link.rel === relation
+        );
+        console.log(`Found ${links.length} links in properties.links with relation ${relation}:`, links);
+      }
+    }
+    
+    if (links.length === 0) {
+      // If still no links, check for ID reference properties
+      const properties = resource.getProperties();
+      const refProp = `${relation}Id`;
+      if (properties.has(refProp) && typeof properties.get(refProp) === 'string') {
+        const targetId = properties.get(refProp) as string;
+        console.log(`Found ID reference property ${refProp}: ${targetId}`);
+        
+        // Create synthetic link
+        links = [{ 
+          rel: relation,
+          href: `/${relation}/${targetId}`
+        }];
+      }
+    }
+    
+    console.log(`Final links: ${links.length} with relation ${relation}:`, links);
+    
     if (links.length === 0) return null;
     
     const results = [];
     for (const link of links) {
       const href = link.href;
-      const targetParts = href.split('/').filter(Boolean);
-      if (targetParts.length === 2) {
-        const targetResource = await this.store.get(targetParts[0], targetParts[1]);
-        if (targetResource) results.push(targetResource.toJSON());
+      if (!href.startsWith('/')) {
+        console.log(`Skipping link with invalid href: ${href}`);
+        continue;
+      }
+      
+      const targetParts = href.substring(1).split('/');
+      if (targetParts.length !== 2) {
+        console.log(`Skipping link with invalid format: ${href}`);
+        continue;
+      }
+      
+      const [targetType, targetId] = targetParts;
+      console.log(`Resolving link to ${targetType}/${targetId}`);
+      
+      const targetResource = await this.store.get(targetType, targetId);
+      if (targetResource) {
+        console.log(`Target resource found: ${targetType}/${targetId}`);
+        results.push(targetResource.toJSON());
+      } else {
+        console.log(`Target resource not found: ${targetType}/${targetId}`);
       }
     }
     
-    return results.length === 1 ? results[0] : results;
+    console.log(`Navigation results: ${results.length} resources found`);
+    
+    return results.length === 0 ? null : 
+           results.length === 1 ? results[0] : 
+           results;
   }
   
   /**

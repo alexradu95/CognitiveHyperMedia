@@ -1,13 +1,12 @@
 # 🐞 Logging and Debugging Guide
 
-This guide explains how to use the logging and debugging features of the Cognitive Hypermedia Framework, particularly for MCP (Model Context Protocol) interactions.
+This guide explains how to use the logging features of the Cognitive Hypermedia Framework.
 
 ## Table of Contents
 
 - [Basic Logging](#basic-logging)
 - [Log Levels](#log-levels)
 - [Environment-Specific Logging](#environment-specific-logging)
-- [MCP Debugging](#mcp-debugging)
 - [Performance Monitoring](#performance-monitoring)
 - [Advanced Configuration](#advanced-configuration)
 
@@ -100,87 +99,37 @@ const compositeTransport = createCompositeTransport([
 const logger = createLogger("myapp", compositeTransport);
 ```
 
-## MCP Debugging
-
-For debugging MCP protocol interactions, use the MCP debugging utilities:
-
-```typescript
-import { createMcpDebugger, MessageDirection } from "./mod.ts";
-
-// Create an MCP debugger
-const mcpDebugger = createMcpDebugger();
-
-// Log incoming and outgoing messages
-mcpDebugger.logIncoming("resource.read", { uri: "file:///example.txt" }, "session-123");
-mcpDebugger.logOutgoing("resource.content", { content: "File content..." }, "session-123");
-
-// Time operations
-const endTimer = mcpDebugger.startOperation("read-file", "session-123");
-// ... perform operation
-endTimer(); // Records the time taken
-
-// Get session statistics
-const stats = mcpDebugger.getSessionStats();
-console.log(stats);
-```
-
-### MCP Debug Adapter
-
-For more comprehensive MCP debugging, use the MCP debug adapter:
-
-```typescript
-import { createMcpDebugAdapter } from "./mod.ts";
-import { McpServer } from "npm:@modelcontextprotocol/sdk/server/mcp.js";
-
-// Create a server
-const server = new McpServer({ name: "My Server", version: "1.0.0" });
-
-// Create a debug adapter
-const debugAdapter = createMcpDebugAdapter({
-  includePayloads: true,
-  trackPerformance: true,
-  // Sanitize sensitive data from logs
-  sanitizePayload: (payload) => {
-    if (typeof payload === 'object' && payload !== null && 'password' in payload) {
-      return { ...payload, password: '******' };
-    }
-    return payload;
-  }
-});
-
-// Manually intercept messages
-const { messageInterceptor } = debugAdapter;
-function onIncomingMessage(type: string, payload: unknown, sessionId: string) {
-  const processedPayload = messageInterceptor.interceptIncoming(type, payload, sessionId);
-  // Process the message with the server...
-}
-```
-
 ## Performance Monitoring
 
-To track performance metrics:
+You can add custom timing to track performance metrics:
 
 ```typescript
-import { createMcpDebugger } from "./mod.ts";
+import { createLogger } from "./mod.ts";
 
-const mcpDebugger = createMcpDebugger();
+const logger = createLogger("performance");
 
-// Start timing an operation
-const endTimer = mcpDebugger.startOperation("database-query");
-
-// Perform the operation
-try {
-  // ... run database query
-  // Record successful completion
-  endTimer();
-} catch (error) {
-  // Record error
-  endTimer(error);
+function timeOperation(name: string, fn: () => Promise<any>) {
+  return async () => {
+    const start = Date.now();
+    try {
+      const result = await fn();
+      const duration = Date.now() - start;
+      logger.info(`Operation ${name} completed`, { duration });
+      return result;
+    } catch (error) {
+      const duration = Date.now() - start;
+      logger.error(`Operation ${name} failed`, { duration, error });
+      throw error;
+    }
+  };
 }
 
-// View performance statistics
-const stats = mcpDebugger.getSessionStats();
-console.log(stats);
+// Usage
+const timedDatabaseQuery = timeOperation("database-query", async () => {
+  // database operation
+});
+
+await timedDatabaseQuery();
 ```
 
 ## Advanced Configuration
@@ -248,12 +197,4 @@ Use structured logging with context for better log analysis:
 import { createLogger } from "./mod.ts";
 
 const logger = createLogger("myapp");
-
-// Add default context to all logs from a component
-const userLogger = logger.withContext({ component: "user-service" });
-
-function processUser(userId: string) {
-  // This context will be merged with the default context
-  userLogger.info("Processing user", { userId, action: "process" });
-}
 ``` 

@@ -1,7 +1,8 @@
 // Import from the framework
 import { 
   CognitiveStore,
-  StorageFactory
+  StorageFactory,
+  createBridge
 } from "../../mod.ts";
 
 // Import MCP components from the SDK
@@ -59,18 +60,54 @@ async function main() {
     const store = new CognitiveStore(kvStorage);
     console.error("✅ Cognitive store initialized.");
     
+    // Create a bridge for the store
+    const bridge = createBridge(store);
+    console.error("✅ Cognitive bridge created.");
+    
     // Register state machine for task type
     store.registerStateMachine("task", taskStateMachineDefinition);
     console.error("✅ Task state machine registered.");
 
     // Start MCP server over stdio for integration with LLMs
-    setupMcpServer(store).then(() => {
+    try {
+      const server = await setupMcpServer(store);
       console.error("✅ MCP server setup complete.");
-    }).catch(e => {
-      console.error("❌ Error setting up MCP server:", e);
-    });
-  } catch (e) {
-    console.error("❌ Error in main:", e);
+      
+      // Set up cleanup on exit
+      const cleanup = () => {
+        console.error("Shutting down MCP server...");
+        
+        // Attempt to gracefully close the server if methods are available
+        try {
+          // Use type assertion to bypass TypeScript checking
+          const serverAny = server as any;
+          
+          // The MCP SDK may have either close() or disconnect()
+          if (typeof serverAny.close === "function") {
+            serverAny.close();
+          } else if (typeof serverAny.disconnect === "function") {
+            serverAny.disconnect();
+          } else {
+            console.error("No close/disconnect method found on MCP server");
+          }
+        } catch (error) {
+          console.error("Error closing MCP server:", error);
+        }
+        
+        // Always restore original console.log
+        console.log = originalConsoleLog;
+      };
+      
+      Deno.addSignalListener("SIGINT", cleanup);
+      Deno.addSignalListener("SIGTERM", cleanup);
+      
+    } catch (error: unknown) {
+      console.error("❌ Error setting up MCP server:", error);
+      throw error; // Re-throw to be caught by outer try/catch
+    }
+  } catch (error: unknown) {
+    console.error("❌ Error in main:", error);
+    console.log = originalConsoleLog; // Restore on error
     Deno.exit(1);
   }
 }

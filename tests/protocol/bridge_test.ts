@@ -213,6 +213,9 @@ Deno.test("Protocol Bridge - Navigate", async (t) => {
   });
   const taskId = task.getId();
   
+  // Log the created resources
+  console.log(`Created project ${projectId} and task ${taskId}`);
+  
   // Add links to the resources
   // First retrieve the actual resources and verify they exist
   const projectResource = await store.get("project", projectId);
@@ -220,6 +223,9 @@ Deno.test("Protocol Bridge - Navigate", async (t) => {
   
   assertExists(projectResource, "Project resource should exist");
   assertExists(taskResource, "Task resource should exist");
+  
+  // Debug: Log the resources
+  console.log("Task resource before adding links:", taskResource.toJSON());
   
   // Add link to the task (must use performAction for task since it has a state machine)
   const taskLinks = taskResource.getLinks();
@@ -229,10 +235,17 @@ Deno.test("Protocol Bridge - Navigate", async (t) => {
     title: "Parent Project"
   });
   
+  console.log("Task links after adding:", taskLinks);
+  
   // Update properly using perform action
   await store.performAction("task", taskId, "update", {
     links: taskLinks
   });
+  
+  // Verify link was added
+  const updatedTask = await store.get("task", taskId);
+  console.log("Task after update:", updatedTask?.toJSON());
+  console.log("Task links after update:", updatedTask?.getLinks());
   
   // Add link to the project
   const projectLinks = projectResource.getLinks();
@@ -246,6 +259,10 @@ Deno.test("Protocol Bridge - Navigate", async (t) => {
   const projectProperties = projectResource.toJSON().properties;
   projectProperties.links = projectLinks;
   await store.update("project", projectId, projectProperties);
+  
+  // Verify links are set up
+  const updatedProject = await store.get("project", projectId);
+  console.log("Project links after update:", updatedProject?.getLinks());
 
   await t.step("should navigate from task to project using act with navigate action", async () => {
     // Test navigation using act with "navigate" action

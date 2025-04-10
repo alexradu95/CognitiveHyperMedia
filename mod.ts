@@ -9,8 +9,6 @@ export * from "./src/infrastracture/core/statemachine.ts";
 export * from "./src/infrastracture/store/store.ts";
 export * from "./src/infrastracture/store/storage_adapter.ts";
 
-export * from "./src/infrastracture/core/debug.ts";
-
 // Protocol
 export * from "./src/infrastracture/protocol/index.ts";
 
