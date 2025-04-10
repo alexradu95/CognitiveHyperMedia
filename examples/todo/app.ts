@@ -1,10 +1,10 @@
 // Import from the framework
 import { 
-  DenoKvAdapter,
-  CognitiveStore
+  CognitiveStore,
+  StorageFactory
 } from "../../mod.ts";
 
-// Add MCP SDK imports
+// Import MCP components from the SDK
 import { McpServer } from "npm:@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk/server/stdio.js";
 
@@ -52,11 +52,11 @@ async function main() {
   try {
     // Create a persistent store adapter using Deno KV
     const kv = await Deno.openKv();
-    const kvAdapter = new DenoKvAdapter(kv);
-    console.error("✅ Deno KV adapter created.");
+    const kvStorage = StorageFactory.createDenoKvStorageWithInstance(kv);
+    console.error("✅ Deno KV storage created.");
 
-    // Initialize cognitive store with KV adapter
-    const store = new CognitiveStore(kvAdapter);
+    // Initialize cognitive store with KV storage
+    const store = new CognitiveStore(kvStorage);
     console.error("✅ Cognitive store initialized.");
     
     // Register state machine for task type
