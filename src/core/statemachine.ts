@@ -45,6 +45,14 @@ export interface StateMachineDefinition {
 }
 
 /**
+ * Interface representing a transition between states.
+ */
+export interface Transition {
+  target: string;
+  description?: string;
+}
+
+/**
  * ✨ Manages the states and transitions for a specific resource type based on a definition.
  */
 export class StateMachine {
@@ -137,6 +145,31 @@ export class StateMachine {
     
     return Object.values(stateDef.transitions)
       .some(transition => transition.target === toState);
+  }
+
+  /**
+   * ✨ Gets all allowed transitions from a specific state
+   * 
+   * @param state - The current state
+   * @returns Array of transition objects
+   */
+  getTransitionsFrom(state: string): Transition[] {
+    const stateDefinition = this.getStateDefinition(state);
+    if (!stateDefinition || !stateDefinition.transitions) {
+      return [];
+    }
+
+    const transitions: Transition[] = [];
+    
+    // Convert transitions map to array of Transition objects
+    for (const [actionName, transition] of Object.entries(stateDefinition.transitions)) {
+      transitions.push({
+        target: transition.target,
+        description: transition.description
+      });
+    }
+    
+    return transitions;
   }
 }
 

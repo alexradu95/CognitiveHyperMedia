@@ -7,7 +7,7 @@
 // Core exports
 export * from "./src/core/statemachine.ts";
 export * from "./src/store/store.ts";
-export * from "./src/store/storage_adapter.ts";
+export * from "./src/storage/storage.ts";
 
 // Protocol
 export * from "./src/protocol/index.ts";

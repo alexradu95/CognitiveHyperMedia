@@ -5,8 +5,8 @@ import {
   Link,
   ParameterDefinition,
   PresentationHints,
-  ConversationPrompt,
 } from "../core/resource.ts";
+import { ConversationPrompt } from "../core/types.ts";
 import { CognitiveCollection, CollectionBuilder, PaginationInfo } from "../core/collection.ts";
 import { StateMachine, StateMachineDefinition, StateMachineBuilder } from "../core/statemachine.ts";
 import { IStorageAdapter, ListOptions, ListResult } from "../storage/storage.ts";
@@ -97,10 +97,12 @@ export class CognitiveStore {
     await this.storage.create(type, id, resourceData);
 
     // Create the resource instance
+    // Separate core IDs from domain properties before creating instance
+    const { id: _id, type: _type, ...domainProperties } = resourceData;
     const resource = new CognitiveResource({
       id,
       type,
-      properties: resourceData,
+      properties: domainProperties, // Use separated properties
     });
 
     // Enhance with standard actions, relationships, etc.
@@ -116,20 +118,24 @@ export class CognitiveStore {
    * @returns A promise resolving to the enhanced CognitiveResource, or null if not found.
    */
   async get(type: string, id: string): Promise<CognitiveResource | null> {
-    const result = await this.storage.get(type, id);
+    // Assume storage returns plain data (Record<string, unknown>) with top-level fields
+    const resultData = await this.storage.get(type, id);
 
-    if (!result) {
+    if (!resultData) {
       return null; // Return null for not found resources
     }
 
-    // Create basic resource instance
+    // Extract the core ID fields, everything else goes into properties
+    const { id: storedId, type: storedType, ...properties } = resultData;
+
+    // Create the resource instance
     const resource = new CognitiveResource({
-      id,
-      type,
-      properties: result,
+      id: storedId as string || id,
+      type: storedType as string || type, 
+      properties, // Use all other fields as properties
     });
 
-    // Enhance with actions, state info, relationships, etc.
+    // Enhance resource
     this.enhanceResource(resource);
 
     return resource;
@@ -163,6 +169,7 @@ export class CognitiveStore {
       ...existingData,
       ...safeUpdates, // Apply safe updates over existing data
       id, // Ensure original ID is kept
+      type, // Explicitly include the type
       createdAt: existingData.createdAt, // Ensure original createdAt is kept
       updatedAt: new Date().toISOString(), // Set new timestamp
     };
@@ -178,10 +185,12 @@ export class CognitiveStore {
     await this.storage.update(type, id, updatedData);
 
     // 4. Create and enhance the updated resource instance
+    // Separate core IDs from domain properties before creating instance
+    const { id: _id, type: _type, ...domainProperties } = updatedData;
     const resource = new CognitiveResource({
       id,
       type,
-      properties: updatedData,
+      properties: domainProperties, // Use separated properties
     });
 
     this.enhanceResource(resource);
@@ -225,13 +234,17 @@ export class CognitiveStore {
 
     // Add enhanced items to the collection
     for (const data of result.items) {
+      // data from storage.list likely has shape { id, type, properties: {...} }
       const id = data.id as string;
+      // Extract the nested 'properties' object
+      const domainProperties = data.properties as Record<string, unknown> || {};
+      
       const resource = new CognitiveResource({
-        id,
-        type,
-        properties: data,
+        id, // Use the ID extracted from data
+        type, // Use the collection type passed to getCollection
+        properties: domainProperties, // Use extracted nested properties
       });
-      this.enhanceResource(resource);
+      this.enhanceResource(resource); // Reads from resource.getProperties()
       collectionBuilder.item(resource);
     }
 
@@ -308,10 +321,12 @@ export class CognitiveStore {
     }
 
     // Create a temporary resource object to evaluate the action
+    // Separate properties correctly
+    const { id: _id1, type: _type1, ...domainProperties1 } = existingData;
     const resource = new CognitiveResource({
       id,
       type,
-      properties: existingData,
+      properties: domainProperties1, // Use separated properties
     });
     this.enhanceResource(resource);
 
@@ -382,10 +397,12 @@ export class CognitiveStore {
     await this.storage.update(type, id, updatedData);
 
     // 7. Create a fresh resource with the updated data
+    // Separate properties correctly
+    const { id: _id2, type: _type2, ...domainProperties2 } = updatedData;
     const updatedResource = new CognitiveResource({
       id,
       type,
-      properties: updatedData,
+      properties: domainProperties2, // Use separated properties
     });
     this.enhanceResource(updatedResource);
 
@@ -488,8 +505,7 @@ export class CognitiveStore {
       const actionId = `transition-to-${transition.target}`;
       const definition = {
         description: transition.description || `Change status to ${transition.target}`,
-        effect: `Changes the status from '${currentState}' to '${transition.target}'`,
-        parameters: transition.parameters || {}
+        effect: `Changes the status from '${currentState}' to '${transition.target}'`
       };
       
       resource.addAction(actionId, definition);
@@ -499,7 +515,7 @@ export class CognitiveStore {
     resource.setState({
       current: currentState,
       description: stateMachine.getStateDescription(currentState),
-      allowedTransitions: transitions.map(t => t.target),
+      allowedTransitions: transitions.map((t: { target: string }) => t.target),
     });
   }
 
@@ -543,9 +559,7 @@ export class CognitiveStore {
         resource.setPresentation({
           icon: "task_alt",
           color: "#4285F4", 
-          primaryProperty: "title",
-          secondaryProperty: "description",
-          metadata: ["status", "dueDate"]
+          emphasisProperties: ["title", "description", "status", "dueDate"]
         });
         break;
         
@@ -553,9 +567,7 @@ export class CognitiveStore {
         resource.setPresentation({
           icon: "note",
           color: "#0F9D58",
-          primaryProperty: "title",
-          secondaryProperty: "content",
-          metadata: ["createdAt"]
+          emphasisProperties: ["title", "content", "createdAt"]
         });
         break;
         
@@ -563,9 +575,7 @@ export class CognitiveStore {
         resource.setPresentation({
           icon: "person",
           color: "#7B1FA2",
-          primaryProperty: "name",
-          secondaryProperty: "email",
-          metadata: ["role", "department"]
+          emphasisProperties: ["name", "email", "role", "department"]
         });
         break;
         
@@ -573,8 +583,7 @@ export class CognitiveStore {
         // Default presentation for other types
         resource.setPresentation({
           icon: "description",
-          primaryProperty: "name",
-          secondaryProperty: "description"
+          emphasisProperties: ["name", "description"]
         });
     }
   }
@@ -595,13 +604,18 @@ export class CognitiveStore {
           resource.addPrompt({
             type: "suggestion",
             text: "Start working on this task?",
-            action: "transition-to-in_progress"
+            priority: "medium"
           });
         } else if (status === "in_progress") {
           resource.addPrompt({
             type: "suggestion",
-            text: "Mark this task as completed?",
-            action: "transition-to-done"
+            text: "Mark task as complete?",
+            priority: "medium"
+          });
+          resource.addPrompt({
+            type: "suggestion",
+            text: "Need to block this task?",
+            priority: "low"
           });
         }
         break;
@@ -610,7 +624,7 @@ export class CognitiveStore {
         resource.addPrompt({
           type: "follow-up",
           text: "Would you like to convert this note to a task?",
-          action: "convert-to-task"
+          priority: "low"
         });
         break;
     }

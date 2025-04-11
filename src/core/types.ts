@@ -140,6 +140,9 @@ export interface PresentationHints {
   emphasisProperties?: string[]; // Property names to highlight
   progressIndicator?: ProgressIndicator;
   actionPriorities?: ActionPriorities;
+  primaryProperty?: string; // Main property to display
+  secondaryProperty?: string; // Supporting property to display
+  metadata?: string[]; // Properties to show as metadata fields
 }
 
 /**
@@ -166,7 +169,7 @@ export interface ActionPriorities {
 export interface ConversationPrompt {
   type: PromptType;
   text: string;
-  action?: string; // Related action ID
+  action?: string; // Related action ID that can be triggered
   priority?: PriorityLevel;
 }
 

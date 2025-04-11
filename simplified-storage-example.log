@@ -1,15 +1,3 @@
 === SIMPLIFIED STORAGE EXAMPLE LOG ===
 Creating store...
-✅ Store created successfully!
-✅ Bridge created.
-Registering state machine...
-✅ State machine registered.
-Creating resource...
-✅ Created resource with ID: 01008e91-4716-4245-a44d-43eede172ba7
-Performing 'start' action on resource 01008e91-4716-4245-a44d-43eede172ba7...
-✅ Updated resource status: active
-Retrieving resource 01008e91-4716-4245-a44d-43eede172ba7...
-✅ Retrieved resource status: active
-
-Example completed successfully! ✨
-Check the log file 'simplified-storage-example.log' for complete output.
+❌ Error: Deno.openKv is not a function

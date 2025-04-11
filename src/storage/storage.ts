@@ -1,5 +1,5 @@
 /**
- * 📄 Core storage adapter interface and Deno KV implementation
+ * 📄 Core storage adapter and Deno KV implementation
  */
 
 /**
@@ -30,69 +30,9 @@ export interface ListResult {
 }
 
 /**
- * 🔌 Interface for storage adapters
- * 
- * Simplified interface focused on essential CRUD operations
- */
-export interface IStorageAdapter {
-  /**
-   * Create a new record in storage
-   * 
-   * @param type - Resource type
-   * @param id - Resource identifier
-   * @param data - Resource data to store
-   */
-  create(type: string, id: string, data: Record<string, unknown>): Promise<void>;
-  
-  /**
-   * Retrieve a record from storage
-   * 
-   * @param type - Resource type
-   * @param id - Resource identifier
-   * @returns Record data or null if not found
-   */
-  get(type: string, id: string): Promise<Record<string, unknown> | null>;
-  
-  /**
-   * Update an existing record
-   * 
-   * @param type - Resource type
-   * @param id - Resource identifier
-   * @param data - Updated resource data
-   */
-  update(type: string, id: string, data: Record<string, unknown>): Promise<void>;
-  
-  /**
-   * Delete a record from storage
-   * 
-   * @param type - Resource type
-   * @param id - Resource identifier
-   */
-  delete(type: string, id: string): Promise<void>;
-  
-  /**
-   * List records of a specific type
-   * 
-   * @param type - Resource type
-   * @param options - Query options (filter, pagination)
-   * @returns Array of matching records and total count
-   */
-  list(type: string, options?: ListOptions): Promise<ListResult>;
-  
-  /**
-   * List all resource types
-   * 
-   * @returns Array of resource type strings
-   */
-  listTypes(): Promise<string[]>;
-}
-
-/**
  * 🗄️ Deno KV implementation of storage
- * 
- * @implements IStorageAdapter
  */
-export class DenoKvStorage implements IStorageAdapter {
+export class DenoKvStorage {
   private kv: Deno.Kv;
   
   /**
@@ -271,11 +211,50 @@ export async function createDenoKvStorage(path?: string): Promise<DenoKvStorage>
 }
 
 /**
- * ⚙️ Default function to create a standard storage implementation (Deno KV)
+ * ⚙️ Default function to create storage implementation (Deno KV)
  * 
  * @param path - Optional path to the KV database
  * @returns Promise resolving to a storage implementation
  */
-export async function createStorage(path?: string): Promise<IStorageAdapter> {
+export async function createStorage(path?: string): Promise<DenoKvStorage> {
   return await createDenoKvStorage(path);
+}
+
+// Import CognitiveStore to avoid circular dependency
+import { CognitiveStore } from "../store/store.ts";
+
+/**
+ * 🏭 Factory class for creating storage and stores
+ */
+export class StorageFactory {
+  /**
+   * ✨ Creates a Deno KV storage adapter
+   * 
+   * @param path - Optional path to the KV database
+   * @returns A new DenoKvStorage instance
+   */
+  static async createDenoKvStorage(path?: string): Promise<DenoKvStorage> {
+    return await createDenoKvStorage(path);
+  }
+  
+  /**
+   * ✨ Creates a Deno KV storage adapter with an existing KV instance
+   * 
+   * @param kv - Existing Deno KV instance
+   * @returns A new DenoKvStorage instance
+   */
+  static createDenoKvStorageWithInstance(kv: Deno.Kv): DenoKvStorage {
+    return new DenoKvStorage(kv);
+  }
+  
+  /**
+   * ✨ Creates a cognitive store with default storage implementation
+   * 
+   * @param path - Optional path to the KV database
+   * @returns A new CognitiveStore instance
+   */
+  static async createStore(path?: string): Promise<CognitiveStore> {
+    const storage = await createStorage(path);
+    return new CognitiveStore(storage);
+  }
 } 
